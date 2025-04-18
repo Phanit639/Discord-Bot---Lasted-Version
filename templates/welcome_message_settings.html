@@ -1,0 +1,447 @@
+{% extends "base.html" %}
+
+{% block title %}ตั้งค่าข้อความต้อนรับ - ระบบจัดการบอท Discord{% endblock %}
+
+{% block head %}
+<style>
+    .setting-card {
+        margin-bottom: 20px;
+    }
+    .card-header .btn-refresh {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+    .invalid-feedback {
+        display: none;
+    }
+    .is-invalid ~ .invalid-feedback {
+        display: block;
+    }
+    .option-container {
+        border: 1px solid #ddd;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+    }
+    .input-group .identifier-input {
+        border-right: none;
+    }
+    .input-group .toggle-visibility {
+        background: #f8f9fa;
+        border: 1px solid #ced4da;
+        border-left: none;
+        cursor: pointer;
+        padding: 0.375rem 0.75rem;
+        display: flex;
+        align-items: center;
+    }
+    .input-group .toggle-visibility:hover {
+        background: #e9ecef;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="fas fa-comment-dots"></i> ตั้งค่าข้อความต้อนรับ</h2>
+    <div>
+        <button id="save-all-settings" class="btn btn-success">
+            <i class="fas fa-save"></i> บันทึกการตั้งค่า
+        </button>
+    </div>
+</div>
+
+<form id="settings-form" method="POST" action="/settings/welcome_messages">
+    <div class="row">
+        <div class="card setting-card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-comment-dots"></i> ตั้งค่าข้อความต้อนรับ</h5>
+                <button type="button" id="add-message-btn" class="btn btn-sm btn-light">
+                    <i class="fas fa-plus"></i> เพิ่มข้อความต้อนรับ
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> ตั้งค่าข้อความต้อนรับและตัวเลือกการชำระเงินสำหรับช่องใหม่ในหมวดหมู่ที่เลือก
+                </div>
+                <div id="message-settings-container">
+                    {% for category_id, data in config.welcome_messages.items() %}
+                    <div class="message-settings mb-4" data-category-id="{{ category_id }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold">หมวดหมู่ ID: {{ category_id }} ({{ config.categories[category_id] or 'ไม่ทราบชื่อ' }})</h6>
+                            <button type="button" class="btn btn-sm btn-danger delete-message-btn">
+                                <i class="fas fa-trash"></i> ลบ
+                            </button>
+                        </div>
+                        <div class="mb-3">
+                            <label>หมวดหมู่:</label>
+                            <select name="{{ category_id }}_category_id" class="form-select category-select" disabled>
+                                <option value="{{ category_id }}">{{ config.categories[category_id] or category_id }}</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label>รหัสบัตรประชาชนสำหรับ PromptPay (13 หลัก):</label>
+                            <div class="input-group">
+                                <input type="password" name="{{ category_id }}_identifier" class="form-control identifier-input" value="{{ data.identifier }}" pattern="^\d{1}-\d{4}-\d{5}-\d{2}-\d{1}$" required>
+                                <span class="toggle-visibility" title="แสดง/ซ่อนรหัสบัตรประชาชน"><i class="fas fa-eye"></i></span>
+                            </div>
+                            <small class="form-text text-muted">เช่น 1-2345-67890-12-3</small>
+                            <div class="invalid-feedback">โปรดระบุรหัสบัตรประชาชนในรูปแบบ x-xxxx-xxxxx-xx-x</div>
+                        </div>
+                        <div class="mb-3">
+                            <label>ข้อความต้อนรับ:</label>
+                            <textarea name="{{ category_id }}_message" class="form-control message-input" rows="3">{{ data.message }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label>ตัวเลือกการชำระเงิน:</label>
+                            <div class="options-list">
+                                {% for option in data.options %}
+                                <div class="option-container">
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <label>ข้อความตัวเลือก:</label>
+                                            <input type="text" name="{{ category_id }}_option_text_{{ loop.index0 }}" class="form-control option-text-input" value="{{ option.text }}" placeholder="เช่น ฟาร์ม 1 วัน (15 บาท)">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label>จำนวนเงิน (บาท):</label>
+                                            <input type="number" name="{{ category_id }}_option_amount_{{ loop.index0 }}" class="form-control option-amount-input" value="{{ option.amount }}" step="0.01" min="0">
+                                        </div>
+                                        <div class="col-md-1 d-flex align-items-end">
+                                            <button type="button" class="btn btn-sm btn-danger remove-option-btn">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary add-option-btn mt-2">
+                                <i class="fas fa-plus"></i> เพิ่มตัวเลือก
+                            </button>
+                        </div>
+                        <hr>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div id="new-message-template" class="d-none">
+                    <div class="message-settings mb-4" data-category-id="NEW_MESSAGE">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold">ข้อความต้อนรับใหม่</h6>
+                            <button type="button" class="btn btn-sm btn-danger delete-message-btn">
+                                <i class="fas fa-trash"></i> ลบ
+                            </button>
+                        </div>
+                        <div class="mb-3">
+                            <label>หมวดหมู่:</label>
+                            <select class="form-select category-select" required>
+                                <option value="">-- เลือกหมวดหมู่ --</option>
+                                {% for id, name in config.categories.items() %}
+                                <option value="{{ id }}">{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="invalid-feedback">โปรดเลือกหมวดหมู่</div>
+                        </div>
+                        <div class="mb-3">
+                            <label>รหัสบัตรประชาชนสำหรับ PromptPay (13 หลัก):</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control identifier-input" pattern="^\d{1}-\d{4}-\d{5}-\d{2}-\d{1}$" placeholder="เช่น 1-2345-67890-12-3" required>
+                                <span class="toggle-visibility" title="แสดง/ซ่อนรหัสบัตรประชาชน"><i class="fas fa-eye"></i></span>
+                            </div>
+                            <small class="form-text text-muted">เช่น 1-2345-67890-12-3</small>
+                            <div class="invalid-feedback">โปรดระบุรหัสบัตรประชาชนในรูปแบบ x-xxxx-xxxxx-xx-x</div>
+                        </div>
+                        <div class="mb-3">
+                            <label>ข้อความต้อนรับ:</label>
+                            <textarea class="form-control message-input" rows="3" placeholder="เช่น สวัสดีจ้า! 🎉 เลือกแพ็กเกจฟาร์มที่ต้องการเลยน้า" required></textarea>
+                            <div class="invalid-feedback">โปรดระบุข้อความต้อนรับ</div>
+                        </div>
+                        <div class="mb-3">
+                            <label>ตัวเลือกการชำระเงิน:</label>
+                            <div class="options-list">
+                                <div class="option-container">
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <label>ข้อความตัวเลือก:</label>
+                                            <input type="text" class="form-control option-text-input" placeholder="เช่น ฟาร์ม 1 วัน (15 บาท)" required>
+                                            <div class="invalid-feedback">โปรดระบุข้อความตัวเลือก</div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label>จำนวนเงิน (บาท):</label>
+                                            <input type="number" class="form-control option-amount-input" step="0.01" min="0" placeholder="เช่น 15" required>
+                                            <div class="invalid-feedback">โปรดระบุจำนวนเงิน</div>
+                                        </div>
+                                        <div class="col-md-1 d-flex align-items-end">
+                                            <button type="button" class="btn btn-sm btn-danger remove-option-btn">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary add-option-btn mt-2">
+                                <i class="fas fa-plus"></i> เพิ่มตัวเลือก
+                            </button>
+                        </div>
+                        <hr>
+                    </div>
+                </div>
+                <div id="no-messages-message" class="alert alert-warning text-center" style="display: {% if config.welcome_messages|length > 0 %}none{% else %}block{% endif %};">
+                    <i class="fas fa-exclamation-circle"></i> ยังไม่มีการตั้งค่าข้อความต้อนรับ คลิก "เพิ่มข้อความต้อนรับ" เพื่อเริ่มต้น
+                </div>
+            </div>
+        </div>
+        <div class="d-grid gap-2 col-md-6 mx-auto my-4">
+            <button type="submit" class="btn btn-lg btn-success">
+                <i class="fas fa-save"></i> บันทึกการตั้งค่า
+            </button>
+        </div>
+    </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    setupMessageEvents();
+
+    $('#add-message-btn').on('click', function(e) {
+        e.preventDefault();
+        const newMessagesNotSaved = $('#message-settings-container > .message-settings[data-category-id="NEW_MESSAGE"]').length;
+        if (newMessagesNotSaved > 0) {
+            alert('กรุณากรอกข้อมูลข้อความต้อนรับที่กำลังสร้างให้ครบก่อนเพิ่มใหม่');
+            $('#message-settings-container > .message-settings[data-category-id="NEW_MESSAGE"]').first().find('.category-select').focus();
+            return;
+        }
+        const template = $('#new-message-template').html();
+        $('#message-settings-container').append(template);
+        $('#no-messages-message').hide();
+        const newMessage = $('#message-settings-container > .message-settings').last();
+        $('html, body').animate({
+            scrollTop: newMessage.offset().top - 100
+        }, 500);
+        newMessage.find('.category-select').focus();
+        setupMessageEvents();
+    });
+
+    $('#settings-form').submit(function(e) {
+        e.preventDefault();
+        const messages = collectMessages();
+        if (Object.keys(messages).length === 0) {
+            alert('กรุณาเพิ่มอย่างน้อยหนึ่งข้อความต้อนรับก่อนบันทึก');
+            return;
+        }
+        const submitBtn = $(this).find('button[type="submit"]');
+        const originalBtnText = submitBtn.html();
+        submitBtn.html('<i class="fas fa-spinner fa-spin"></i> กำลังบันทึก...');
+        submitBtn.prop('disabled', true);
+        $.ajax({
+            url: '/settings/welcome_messages',
+            type: 'POST',
+            data: { welcome_messages: JSON.stringify(messages) },
+            success: function(response) {
+                alert('บันทึกการตั้งค่าเรียบร้อยแล้ว');
+                location.reload();
+            },
+            error: function(xhr) {
+                console.error('Error saving welcome messages:', xhr);
+                alert('เกิดข้อผิดพลาดในการบันทึก: ' + (xhr.responseJSON?.message || xhr.responseText || 'ไม่ทราบสาเหตุ'));
+                submitBtn.html(originalBtnText);
+                submitBtn.prop('disabled', false);
+            }
+        });
+    });
+
+    function setupMessageEvents() {
+        $('.delete-message-btn').off('click').on('click', function() {
+            if (confirm('คุณแน่ใจหรือไม่ที่จะลบข้อความต้อนรับนี้?')) {
+                $(this).closest('.message-settings').remove();
+                if ($('#message-settings-container').children('.message-settings').length === 0) {
+                    $('#no-messages-message').show();
+                }
+            }
+        });
+
+        $('.add-option-btn').off('click').on('click', function() {
+            const optionsList = $(this).siblings('.options-list');
+            const optionCount = optionsList.find('.option-container').length;
+            const newOption = $(`
+                <div class="option-container">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <label>ข้อความตัวเลือก:</label>
+                            <input type="text" class="form-control option-text-input" placeholder="เช่น ฟาร์ม 1 วัน (15 บาท)" required>
+                            <div class="invalid-feedback">โปรดระบุข้อความตัวเลือก</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label>จำนวนเงิน (บาท):</label>
+                            <input type="number" class="form-control option-amount-input" step="0.01" min="0" placeholder="เช่น 15" required>
+                            <div class="invalid-feedback">โปรดระบุจำนวนเงิน</div>
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end">
+                            <button type="button" class="btn btn-sm btn-danger remove-option-btn">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `);
+            optionsList.append(newOption);
+            setupOptionEvents();
+        });
+
+        $('.remove-option-btn').off('click').on('click', function() {
+            const optionContainer = $(this).closest('.option-container');
+            if ($(this).closest('.options-list').find('.option-container').length > 1) {
+                optionContainer.remove();
+            } else {
+                alert('ต้องมีอย่างน้อยหนึ่งตัวเลือกการชำระเงิน');
+            }
+        });
+
+        $('.category-select').off('change').on('change', function() {
+            const messageSettings = $(this).closest('.message-settings');
+            const categoryId = $(this).val();
+            if (categoryId) {
+                const isDuplicate = $('.message-settings').not(messageSettings).filter(`[data-category-id="${categoryId}"]`).length > 0;
+                if (isDuplicate) {
+                    $(this).addClass('is-invalid');
+                    $(this).siblings('.invalid-feedback').text('หมวดหมู่นี้มีข้อความต้อนรับอยู่แล้ว');
+                    return;
+                }
+                messageSettings.attr('data-category-id', categoryId);
+                $(this).removeClass('is-invalid');
+                $(this).siblings('.invalid-feedback').text('โปรดเลือกหมวดหมู่');
+            }
+        });
+
+        $('.identifier-input').off('input').on('input', function() {
+            $(this).removeClass('is-invalid');
+            const value = $(this).val();
+            if (value && !/^\d{1}-\d{4}-\d{5}-\d{2}-\d{1}$/.test(value)) {
+                $(this).addClass('is-invalid');
+                $(this).siblings('.invalid-feedback').text('โปรดระบุรหัสบัตรประชาชนในรูปแบบ x-xxxx-xxxxx-xx-x');
+            }
+        });
+
+        $('.toggle-visibility').off('click').on('click', function() {
+            const input = $(this).siblings('.identifier-input');
+            const icon = $(this).find('i');
+            if (input.attr('type') === 'password') {
+                input.attr('type', 'text');
+                icon.removeClass('fa-eye').addClass('fa-eye-slash');
+            } else {
+                input.attr('type', 'password');
+                icon.removeClass('fa-eye-slash').addClass('fa-eye');
+            }
+        });
+
+        $('.message-input, .option-text-input, .option-amount-input').off('input').on('input', function() {
+            $(this).removeClass('is-invalid');
+            const value = $(this).val();
+            if ($(this).hasClass('option-amount-input') && (isNaN(value) || value <= 0)) {
+                $(this).addClass('is-invalid');
+                $(this).siblings('.invalid-feedback').text('โปรดระบุจำนวนเงินที่มากกว่า 0');
+            }
+            if ($(this).hasClass('option-text-input') && !value.trim()) {
+                $(this).addClass('is-invalid');
+                $(this).siblings('.invalid-feedback').text('โปรดระบุข้อความตัวเลือก');
+            }
+            if ($(this).hasClass('message-input') && !value.trim()) {
+                $(this).addClass('is-invalid');
+                $(this).siblings('.invalid-feedback').text('โปรดระบุข้อความต้อนรับ');
+            }
+        });
+    }
+
+    function setupOptionEvents() {
+        $('.remove-option-btn').off('click').on('click', function() {
+            const optionContainer = $(this).closest('.option-container');
+            if ($(this).closest('.options-list').find('.option-container').length > 1) {
+                optionContainer.remove();
+            } else {
+                alert('ต้องมีอย่างน้อยหนึ่งตัวเลือกการชำระเงิน');
+            }
+        });
+
+        $('.option-text-input').off('input').on('input', function() {
+            $(this).removeClass('is-invalid');
+            const value = $(this).val();
+            if (!value.trim()) {
+                $(this).addClass('is-invalid');
+                $(this).siblings('.invalid-feedback').text('โปรดระบุข้อความตัวเลือก');
+            }
+        });
+
+        $('.option-amount-input').off('input').on('input', function() {
+            $(this).removeClass('is-invalid');
+            const value = parseFloat($(this).val());
+            if (isNaN(value) || value <= 0) {
+                $(this).addClass('is-invalid');
+                $(this).siblings('.invalid-feedback').text('โปรดระบุจำนวนเงินที่มากกว่า 0');
+            }
+        });
+    }
+
+    function collectMessages() {
+        const messages = {};
+        $('.message-settings').each(function() {
+            const categoryId = $(this).attr('data-category-id');
+            if (categoryId === 'NEW_MESSAGE') {
+                return;
+            }
+            const message = $(this).find('.message-input').length > 0
+                ? $(this).find('.message-input').val().trim()
+                : $(`textarea[name="${categoryId}_message"]`).val().trim();
+            const identifier = $(this).find('.identifier-input').length > 0
+                ? $(this).find('.identifier-input').val().trim()
+                : $(`input[name="${categoryId}_identifier"]`).val().trim();
+            const options = [];
+            $(this).find('.option-container').each(function(index) {
+                const text = $(this).find('.option-text-input').length > 0
+                    ? $(this).find('.option-text-input').val().trim()
+                    : $(`input[name="${categoryId}_option_text_${index}"]`).val().trim();
+                const amount = $(this).find('.option-amount-input').length > 0
+                    ? parseFloat($(this).find('.option-amount-input').val())
+                    : parseFloat($(`input[name="${categoryId}_option_amount_${index}"]`).val());
+                if (text && !isNaN(amount) && amount > 0) {
+                    options.push({ text, amount });
+                }
+            });
+            if (categoryId && message && identifier && /^\d{1}-\d{4}-\d{5}-\d{2}-\d{1}$/.test(identifier) && options.length > 0) {
+                messages[categoryId] = {
+                    message,
+                    identifier,
+                    options
+                };
+            } else {
+                console.log(`ข้ามการตั้งค่า: ${categoryId} (ข้อมูลไม่ครบถ้วน)`);
+                if (!categoryId) {
+                    alert(`หมวดหมู่ ID ${categoryId} ไม่ถูกต้อง กรุณาตรวจสอบ`);
+                } else if (!message) {
+                    alert(`กรุณาระบุข้อความต้อนรับสำหรับหมวดหมู่ ID ${categoryId}`);
+                } else if (!/^\d{1}-\d{4}-\d{5}-\d{2}-\d{1}$/.test(identifier)) {
+                    alert(`รหัสบัตรประชาชนสำหรับหมวดหมู่ ID ${categoryId} ไม่ถูกต้อง ต้องอยู่ในรูปแบบ x-xxxx-xxxxx-xx-x (เช่น 1-2345-67890-12-3)`);
+                } else if (options.length === 0) {
+                    alert(`กรุณาเพิ่มตัวเลือกการชำระเงินอย่างน้อยหนึ่งตัวเลือกสำหรับหมวดหมู่ ID ${categoryId}`);
+                }
+            }
+        });
+        return messages;
+    }
+
+    $('#save-all-settings').click(function(e) {
+        e.preventDefault();
+        $('#settings-form').submit();
+    });
+
+    let originalFormData = $('#settings-form').serialize();
+    $('#settings-form :input').on('change input', function() {
+        if ($('#settings-form').serialize() !== originalFormData) {
+            window.onbeforeunload = () => "คุณมีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก คุณแน่ใจหรือไม่ที่จะออกจากหน้านี้?";
+        } else {
+            window.onbeforeunload = null;
+        }
+    });
+    $('#settings-form').submit(() => window.onbeforeunload = null);
+});
+</script>
+{% endblock %}

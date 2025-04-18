@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}ตั้งค่าเจตนา - ระบบจัดการบอท Discord{% endblock %}
+
+{% block head %}
+<style>
+    .setting-card {
+        margin-bottom: 20px;
+    }
+    .card-header .btn-refresh {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+    .invalid-feedback {
+        display: none;
+    }
+    .is-invalid ~ .invalid-feedback {
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="fas fa-brain"></i> ตั้งค่าเจตนา</h2>
+    <div>
+        <button id="save-all-settings" class="btn btn-success">
+            <i class="fas fa-save"></i> บันทึกการตั้งค่า
+        </button>
+    </div>
+</div>
+
+<form id="settings-form" method="POST" action="/settings/intents">
+    <div class="row">
+        <div class="card setting-card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-brain"></i> ตั้งค่าเจตนา (Intents)</h5>
+                <button type="button" id="add-intent-btn" class="btn btn-sm btn-light">
+                    <i class="fas fa-plus"></i> เพิ่มเจตนา
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> กรอกชื่อเจตนาและคำสำคัญเพื่อให้บอทเข้าใจคำสั่งของลูกค้า
+                </div>
+                <div id="intent-settings-container">
+                    {% for intent_name, intent_data in config.intents.items() %}
+                    <div class="intent-settings mb-4" data-intent="{{ intent_name }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold">เจตนา "{{ intent_name }}"</h6>
+                            <button type="button" class="btn btn-sm btn-danger delete-intent-btn">
+                                <i class="fas fa-trash"></i> ลบ
+                            </button>
+                        </div>
+                        <div class="mb-3">
+                            <label>คำสำคัญ (แยกด้วยเครื่องหมายจุลภาค):</label>
+                            <input type="text" name="{{ intent_name }}_keywords" class="form-control"
+                                value="{{ intent_data.keywords|join(', ') if intent_data.keywords else '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label>คำตอบ (แยกด้วย ||):</label>
+                            <textarea name="{{ intent_name }}_responses" class="form-control"
+                                rows="3">{{ intent_data.responses|join(' || ') if intent_data.responses else '' }}</textarea>
+                        </div>
+                        <hr>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div id="new-intent-template" class="d-none">
+                    <div class="intent-settings mb-4" data-intent="NEW_INTENT">
+                        <div class="d-flex justify-content-between align-items-center mb-2 intent-name-container">
+                            <div class="input-group" style="max-width: 50%;">
+                                <span class="input-group-text">ชื่อเจตนา</span>
+                                <input type="text" class="form-control intent-name-input" placeholder="เช่น thank_you">
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-success save-intent-name-btn">
+                                    <i class="fas fa-check"></i> บันทึกชื่อเจตนา
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger delete-intent-btn">
+                                    <i class="fas fa-trash"></i> ลบ
+                                </button>
+                            </div>
+                        </div>
+                        <div class="intent-details" style="display: none;">
+                            <div class="mb-3">
+                                <label>คำสำคัญ (แยกด้วยเครื่องหมายจุลภาค):</label>
+                                <input type="text" class="form-control intent-keywords-input" placeholder="เช่น ขอบคุณ, ขอบใจ">
+                            </div>
+                            <div class="mb-3">
+                                <label>คำตอบ (แยกด้วย ||):</label>
+                                <textarea class="form-control intent-responses-input" rows="3"
+                                    placeholder="เช่น ยินดีจ้า || ขอบคุณที่ใช้บริการค่ะ"></textarea>
+                            </div>
+                        </div>
+                        <hr>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="d-grid gap-2 col-md-6 mx-auto my-4">
+        <button type="submit" class="btn btn-lg btn-success">
+            <i class="fas fa-save"></i> บันทึกการตั้งค่า
+        </button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function () {
+    setupIntentEvents();
+
+    $('#add-intent-btn').off('click').on('click', function (e) {
+        e.preventDefault();
+        const newIntentsNotSaved = $('#intent-settings-container > .intent-settings[data-intent="NEW_INTENT"]').length;
+        if (newIntentsNotSaved > 0) {
+            alert('กรุณาบันทึกชื่อเจตนาที่กำลังสร้างอยู่ก่อนเพิ่มเจตนาใหม่');
+            $('#intent-settings-container > .intent-settings[data-intent="NEW_INTENT"]').first().find('.intent-name-input').focus();
+            return;
+        }
+        const template = $('#new-intent-template').html();
+        $('#intent-settings-container').append(template);
+        const newIntent = $('#intent-settings-container > .intent-settings').last();
+        $('html, body').animate({
+            scrollTop: newIntent.offset().top - 100
+        }, 500);
+        newIntent.find('.intent-name-input').focus();
+        setupIntentEvents();
+    });
+
+    $('#settings-form').submit(function (e) {
+        e.preventDefault();
+        const intents = collectIntents();
+        console.log("Intents to send:", intents);
+        if (Object.keys(intents).length === 0) {
+            alert('กรุณาเพิ่มอย่างน้อยหนึ่งเจตนาก่อนบันทึก');
+            return;
+        }
+        const submitBtn = $(this).find('button[type="submit"]');
+        const originalBtnText = submitBtn.html();
+        submitBtn.html('<i class="fas fa-spinner fa-spin"></i> กำลังบันทึก...');
+        submitBtn.prop('disabled', true);
+        $.ajax({
+            url: '/settings/intents',
+            type: 'POST',
+            data: { intents: JSON.stringify(intents) },
+            success: function (response) {
+                alert('บันทึกการตั้งค่าเรียบร้อยแล้ว');
+                location.reload();
+            },
+            error: function (xhr) {
+                console.error('Error saving intents:', xhr);
+                alert('เกิดข้อผิดพลาดในการบันทึก: ' + (xhr.responseText || 'ไม่ทราบสาเหตุ'));
+                submitBtn.html(originalBtnText);
+                submitBtn.prop('disabled', false);
+            }
+        });
+    });
+
+    function setupIntentEvents() {
+        $('.delete-intent-btn').off('click').on('click', function () {
+            if (confirm('คุณแน่ใจหรือไม่ที่จะลบเจตนานี้?')) {
+                $(this).closest('.intent-settings').remove();
+            }
+        });
+
+        $('.save-intent-name-btn').off('click').on('click', function () {
+            const intentSettings = $(this).closest('.intent-settings');
+            const nameInput = intentSettings.find('.intent-name-input');
+            const intentName = nameInput.val().trim();
+
+            if (!intentName) {
+                nameInput.addClass('is-invalid');
+                if (intentSettings.find('.invalid-feedback').length === 0) {
+                    nameInput.after('<div class="invalid-feedback">โปรดระบุชื่อเจตนา</div>');
+                }
+                return;
+            }
+
+            let isDuplicate = false;
+            $('.intent-settings').not(intentSettings).each(function () {
+                const existingIntent = $(this).attr('data-intent');
+                if (existingIntent === intentName) {
+                    isDuplicate = true;
+                    return false;
+                }
+            });
+
+            if (isDuplicate) {
+                nameInput.addClass('is-invalid');
+                if (intentSettings.find('.invalid-feedback').length === 0) {
+                    nameInput.after('<div class="invalid-feedback">มีเจตนานี้อยู่แล้ว</div>');
+                } else {
+                    intentSettings.find('.invalid-feedback').text('มีเจตนานี้อยู่แล้ว');
+                }
+                return;
+            }
+
+            intentSettings.attr('data-intent', intentName);
+            nameInput.prop('disabled', true);
+            nameInput.removeClass('is-invalid');
+            intentSettings.find('.invalid-feedback').remove();
+            $(this).hide();
+            intentSettings.find('.intent-details').slideDown(300);
+            const editBtn = $('<button type="button" class="btn btn-sm btn-outline-primary edit-intent-name-btn ms-2"><i class="fas fa-edit"></i> แก้ไขชื่อ</button>');
+            $(this).after(editBtn);
+            editBtn.on('click', function () {
+                nameInput.prop('disabled', false);
+                nameInput.focus();
+                $(this).hide();
+                $('.save-intent-name-btn').show();
+            });
+        });
+
+        $('.intent-name-input').off('input').on('input', function () {
+            $(this).removeClass('is-invalid');
+            $(this).next('.invalid-feedback').remove();
+        });
+    }
+
+    function collectIntents() {
+        const intents = {};
+        $('.intent-settings').each(function () {
+            const intent = $(this).attr('data-intent');
+            if (intent === 'NEW_INTENT') {
+                return;
+            }
+            let keywords, responses;
+            if ($(this).find('.intent-keywords-input').length > 0) {
+                keywords = $(this).find('.intent-keywords-input').val().split(',').map(k => k.trim()).filter(k => k);
+                responses = $(this).find('.intent-responses-input').val().split('||').map(r => r.trim()).filter(r => r);
+            } else {
+                keywords = $(`input[name="${intent}_keywords"]`).val().split(',').map(k => k.trim()).filter(k => k);
+                responses = $(`textarea[name="${intent}_responses"]`).val().split('||').map(r => r.trim()).filter(r => r);
+            }
+            if (keywords.length > 0 || responses.length > 0) {
+                intents[intent] = {
+                    keywords: keywords,
+                    responses: responses
+                };
+            }
+        });
+        return intents;
+    }
+
+    $('#save-all-settings').click(function (e) {
+        e.preventDefault();
+        $('#settings-form').submit();
+    });
+
+    let originalFormData = $('#settings-form').serialize();
+    $('#settings-form :input').on('change input', function () {
+        if ($('#settings-form').serialize() !== originalFormData) {
+            window.onbeforeunload = () => "คุณมีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก คุณแน่ใจหรือไม่ที่จะออกจากหน้านี้?";
+        } else {
+            window.onbeforeunload = null;
+        }
+    });
+    $('#settings-form').submit(() => window.onbeforeunload = null);
+});
+</script>
+{% endblock %}

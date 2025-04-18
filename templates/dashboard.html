@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}{{ guild.name }} - แดชบอร์ด{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex align-items-center">
+        {% if guild.icon %}
+        <img src="{{ guild.icon }}" class="server-icon-lg me-3" alt="{{ guild.name }}">
+        {% else %}
+        <div class="default-icon-lg me-3">{{ guild.name[:2] }}</div>
+        {% endif %}
+        <h2>{{ guild.name }}</h2>
+    </div>
+    <div>
+        <a href="{{ url_for('servers') }}" class="btn btn-outline-secondary me-2">
+            <i class="fas fa-arrow-left"></i> กลับ
+        </a>
+        <a href="{{ url_for('settings') }}" class="btn btn-primary">
+            <i class="fas fa-cog"></i> ตั้งค่า
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">สมาชิก</h5>
+                        <p class="card-text display-6">{{ guild.members }}</p>
+                    </div>
+                    <i class="fas fa-users fa-3x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">ช่องข้อความ</h5>
+                        <p class="card-text display-6">{{ guild.text_channels }}</p>
+                    </div>
+                    <i class="fas fa-hashtag fa-3x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">ช่องเสียง</h5>
+                        <p class="card-text display-6">{{ guild.voice_channels }}</p>
+                    </div>
+                    <i class="fas fa-microphone fa-3x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">หมวดหมู่</h5>
+                        <p class="card-text display-6">{{ guild.categories }}</p>
+                    </div>
+                    <i class="fas fa-folder fa-3x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- นำส่วนเดิมของแดชบอร์ด (index.html) มาใส่ที่นี่ -->
+<!-- เช่น ล็อกล่าสุด, การตั้งค่าทั่วไป, ฯลฯ -->
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// โค้ด JavaScript ที่จำเป็น
+</script>
+{% endblock %}

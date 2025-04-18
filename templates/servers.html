@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}เซิร์ฟเวอร์ - ระบบจัดการบอท Discord{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-server"></i> เซิร์ฟเวอร์ของคุณ</h2>
+    <div>
+        <a href="{{ url_for('logout') }}" class="btn btn-outline-danger">
+            <i class="fas fa-sign-out-alt"></i> ออกจากระบบ
+        </a>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">เลือกเซิร์ฟเวอร์ที่ต้องการจัดการ</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for guild in guilds %}
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 {% if not guild.accessible %}disabled-card{% endif %}">
+                    <div class="card-body text-center">
+                        {% if guild.icon %}
+                        <img src="https://cdn.discordapp.com/icons/{{ guild.id }}/{{ guild.icon }}.png" class="server-icon mb-3" alt="{{ guild.name }}">
+                        {% else %}
+                        <div class="default-icon mb-3">{{ guild.name[:2] }}</div>
+                        {% endif %}
+                        <h5 class="card-title">{{ guild.name }}</h5>
+                        
+                        {% if guild.accessible %}
+                        <a href="{{ url_for('dashboard', guild_id=guild.id) }}" class="btn btn-primary mt-2">
+                            <i class="fas fa-cog"></i> จัดการ
+                        </a>
+                        {% else %}
+                        <button class="btn btn-secondary mt-2" disabled>
+                            <i class="fas fa-lock"></i> ไม่มีสิทธิ์
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}{% endblock %}

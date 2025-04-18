@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}ตรวจสอบระบบ - ระบบจัดการบอท Discord{% endblock %}
+
+{% block head %}
+<style>
+    .monitor-container {
+        margin-bottom: 20px;
+    }
+    .progress-bar {
+        transition: width 0.5s ease-in-out;
+    }
+    .card-body {
+        padding: 20px;
+    }
+    .refresh-btn {
+        margin-left: 10px;
+    }
+    .stats-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .stats-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="fas fa-desktop"></i> ตรวจสอบระบบ</h2>
+    <div>
+        <button id="refresh-stats" class="btn btn-primary refresh-btn">
+            <i class="fas fa-sync-alt"></i> รีเฟรช
+        </button>
+    </div>
+</div>
+
+<div class="card monitor-container">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-tachometer-alt"></i> สถานะระบบ</h5>
+    </div>
+    <div class="card-body">
+        <div class="mb-4">
+            <h6>การใช้งาน CPU</h6>
+            <div class="progress">
+                <div id="cpu-progress" class="progress-bar bg-info" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <p class="mt-2"><strong>เปอร์เซ็นต์:</strong> <span id="cpu-percent">0%</span></p>
+        </div>
+        <div class="mb-4">
+            <h6>การใช้งานหน่วยความจำ</h6>
+            <div class="progress">
+                <div id="memory-progress" class="progress-bar bg-success" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <div class="stats-container mt-2">
+                <p><strong>เปอร์เซ็นต์:</strong> <span id="memory-percent">0%</span></p>
+                <p><strong>ใช้ไป:</strong> <span id="memory-used">0 GB</span> / <span id="memory-total">0 GB</span></p>
+            </div>
+        </div>
+        <div id="loading-stats" class="text-center" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">กำลังโหลด...</span>
+            </div>
+            <p>กำลังโหลดข้อมูลระบบ...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // ฟังก์ชันสำหรับโหลดข้อมูลระบบ
+    function loadSystemStats() {
+        $('#loading-stats').show();
+        $.get('/api/system_stats', function(data) {
+            if (data.success) {
+                // อัปเดต CPU
+                $('#cpu-progress').css('width', data.cpu_percent + '%').attr('aria-valuenow', data.cpu_percent);
+                $('#cpu-percent').text(data.cpu_percent.toFixed(1) + '%');
+
+                // อัปเดต Memory
+                $('#memory-progress').css('width', data.memory_percent + '%').attr('aria-valuenow', data.memory_percent);
+                $('#memory-percent').text(data.memory_percent.toFixed(1) + '%');
+                $('#memory-used').text(data.memory_used.toFixed(2) + ' GB');
+                $('#memory-total').text(data.memory_total.toFixed(2) + ' GB');
+            } else {
+                alert('ไม่สามารถโหลดข้อมูลระบบได้: ' + data.message);
+            }
+            $('#loading-stats').hide();
+        }).fail(function() {
+            $('#loading-stats').hide();
+            alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์เพื่อดึงข้อมูลระบบ');
+        });
+    }
+
+    // โหลดข้อมูลครั้งแรก
+    loadSystemStats();
+
+    // รีเฟรชเมื่อกดปุ่ม
+    $('#refresh-stats').click(function() {
+        loadSystemStats();
+    });
+
+    // อัปเดตอัตโนมัติทุก 5 วินาที
+    setInterval(loadSystemStats, 5000);
+});
+</script>
+{% endblock %}

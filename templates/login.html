@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}เข้าสู่ระบบ - ระบบจัดการบอท Discord{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0 text-center">เข้าสู่ระบบผ่าน Discord</h4>
+            </div>
+            <div class="card-body text-center">
+                <p class="mb-4">เข้าสู่ระบบด้วยบัญชี Discord ของคุณเพื่อจัดการบอท</p>
+                <a href="{{ url_for('login') }}" class="btn btn-lg btn-discord">
+                    <i class="fab fa-discord me-2"></i> เข้าสู่ระบบด้วย Discord
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}{% endblock %}

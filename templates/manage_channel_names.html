@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block title %}จัดการชื่อช่องอัตโนมัติ - ระบบจัดการบอท Discord{% endblock %}
+
+{% block head %}
+<style>
+    .setting-card {
+        margin-bottom: 20px;
+    }
+    .card-header .btn-refresh {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+    .category-select, .name-format-select {
+        width: 100%;
+    }
+    .invalid-feedback {
+        display: none;
+    }
+    .is-invalid ~ .invalid-feedback {
+        display: block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><i class="fas fa-edit"></i> จัดการชื่อช่องอัตโนมัติ</h2>
+        <div>
+            <button id="add-setting-btn" class="btn btn-primary me-2">
+                <i class="fas fa-plus"></i> เพิ่มการตั้งค่า
+            </button>
+            <button id="save-settings-btn" class="btn btn-success">
+                <i class="fas fa-save"></i> บันทึกการตั้งค่า
+            </button>
+        </div>
+    </div>
+
+    <form id="settings-form" method="POST" action="/settings/channel_names">
+        <div class="card setting-card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-edit"></i> ตั้งค่าการเปลี่ยนชื่อช่อง</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> ตั้งค่าการเปลี่ยนชื่อช่องอัตโนมัติเมื่อสร้างช่องใหม่ในหมวดหมู่ที่เลือก
+                    <br><strong>ตัวอย่าง:</strong>
+                    <ul>
+                        <li><strong>ชื่อเต็ม:</strong> ช่องเดิม → แรกน่า-ใหม่</li>
+                        <li><strong>วันที่นำหน้า:</strong> 13-04-จบงาน</li>
+                        <li><strong>หมายเลขช่อง + วันที่:</strong> 🎫1234-13-04-โกจิต้า</li>
+                    </ul>
+                </div>
+                <div id="name-settings-container">
+                    {% for name, data in config.channel_name_mappings.items() %}
+                    <div class="name-setting mb-4" data-setting-id="{{ name }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2 setting-name-container">
+                            <div class="input-group" style="max-width: 50%;">
+                                <span class="input-group-text">ชื่อการตั้งค่า</span>
+                                <input type="text" name="name_{{ name }}" class="form-control setting-name-input" value="{{ name }}" disabled>
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-outline-primary edit-setting-name-btn ms-2">
+                                    <i class="fas fa-edit"></i> แก้ไขชื่อ
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger delete-setting-btn">
+                                    <i class="fas fa-trash"></i> ลบ
+                                </button>
+                            </div>
+                        </div>
+                        <div class="setting-details">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label>หมวดหมู่หลัก:</label>
+                                    <select name="{{ name }}_category_id_1" class="form-select category-select">
+                                        <option value="">-- เลือกหมวดหมู่ --</option>
+                                        {% for id, category_name in config.categories.items() %}
+                                        <option value="{{ id }}" {% if id == data.category_id %}selected{% endif %}>{{ category_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label>รูปแบบชื่อ:</label>
+                                    <select name="{{ name }}_name_format" class="form-select name-format-select">
+                                        <option value="">-- เลือกรูปแบบ --</option>
+                                        <option value="full_name" {% if data.name_format == 'full_name' %}selected{% endif %}>ชื่อเต็ม</option>
+                                        <option value="date_prefix" {% if data.name_format == 'date_prefix' %}selected{% endif %}>วันที่นำหน้า (วัน-เดือน)</option>
+                                        <option value="ticket_date_prefix" {% if data.name_format == 'ticket_date_prefix' %}selected{% endif %}>หมายเลขช่อง + วันที่</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label>ข้อความสำหรับชื่อช่อง:</label>
+                                <input type="text" name="{{ name }}_custom_text" class="form-control custom-text-input" value="{{ data.custom_text }}" placeholder="เช่น แรกน่า-ใหม่">
+                            </div>
+                            <hr>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div id="no-settings-message" class="alert alert-warning text-center" style="display: {% if config.channel_name_mappings|length > 0 %}none{% else %}block{% endif %};">
+                    <i class="fas fa-exclamation-circle"></i> ยังไม่มีการตั้งค่าใดๆ คลิก "เพิ่มการตั้งค่า" เพื่อเริ่มต้น
+                </div>
+                <div id="new-setting-template" class="d-none">
+                    <div class="name-setting mb-4" data-setting-id="NEW_SETTING">
+                        <div class="d-flex justify-content-between align-items-center mb-2 setting-name-container">
+                            <div class="input-group" style="max-width: 50%;">
+                                <span class="input-group-text">ชื่อการตั้งค่า</span>
+                                <input type="text" class="form-control setting-name-input" placeholder="เช่น ตั้งชื่อแรกน่า">
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-success save-setting-name-btn">
+                                    <i class="fas fa-check"></i> บันทึกชื่อ
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger delete-setting-btn">
+                                    <i class="fas fa-trash"></i> ลบ
+                                </button>
+                            </div>
+                        </div>
+                        <div class="setting-details" style="display: none;">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label>หมวดหมู่หลัก:</label>
+                                    <select class="form-select category-select">
+                                        <option value="">-- เลือกหมวดหมู่ --</option>
+                                        {% for id, name in config.categories.items() %}
+                                        <option value="{{ id }}">{{ name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label>รูปแบบชื่อ:</label>
+                                    <select class="form-select name-format-select">
+                                        <option value="">-- เลือกรูปแบบ --</option>
+                                        <option value="full_name">ชื่อเต็ม</option>
+                                        <option value="date_prefix">วันที่นำหน้า (วัน-เดือน)</option>
+                                        <option value="ticket_date_prefix">หมายเลขช่อง + วันที่</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label>ข้อความสำหรับชื่อช่อง:</label>
+                                <input type="text" class="form-control custom-text-input" placeholder="เช่น แรกน่า-ใหม่">
+                            </div>
+                            <hr>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="d-grid gap-2 col-md-6 mx-auto my-4">
+            <button type="submit" class="btn btn-lg btn-success">
+                <i class="fas fa-save"></i> บันทึกการตั้งค่า
+            </button>
+        </div>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // โหลดข้อมูลหมวดหมู่
+    let categories = {{ config.categories | tojson }};
+    let channelNameMappings = {{ config.channel_name_mappings | tojson | default({}) }};
+
+    // เริ่มต้นการตั้งค่า
+    const $settingsContainer = $('#name-settings-container');
+    if (Object.keys(channelNameMappings).length === 0) {
+        $('#no-settings-message').show();
+    }
+
+    // เพิ่มการตั้งค่าใหม่
+    $('#add-setting-btn').on('click', function(e) {
+        e.preventDefault();
+        const newSettingsNotSaved = $settingsContainer.find('.name-setting[data-setting-id="NEW_SETTING"]').length;
+        if (newSettingsNotSaved > 0) {
+            alert('กรุณาบันทึกชื่อการตั้งค่าที่กำลังสร้างอยู่ก่อนเพิ่มการตั้งค่าใหม่');
+            $settingsContainer.find('.name-setting[data-setting-id="NEW_SETTING"]').first().find('.setting-name-input').focus();
+            return;
+        }
+
+        const template = $('#new-setting-template').html();
+        $settingsContainer.append(template);
+        $('#no-settings-message').hide();
+
+        const $newSetting = $settingsContainer.children().last();
+        $('html, body').animate({
+            scrollTop: $newSetting.offset().top - 100
+        }, 500);
+
+        $newSetting.find('.setting-name-input').focus();
+        setupSettingEvents();
+    });
+
+    // บันทึกการตั้งค่า
+    $('#settings-form').submit(function(e) {
+        e.preventDefault();
+        const mappings = collectSettings();
+        if (mappings.length === 0) {
+            alert('กรุณาเพิ่มการตั้งค่าที่สมบูรณ์อย่างน้อย 1 รายการ');
+            return;
+        }
+
+        console.log("ข้อมูลที่จะส่ง:", mappings);
+
+        const submitBtn = $(this).find('button[type="submit"]');
+        const originalBtnText = submitBtn.html();
+        submitBtn.html('<i class="fas fa-spinner fa-spin"></i> กำลังบันทึก...');
+        submitBtn.prop('disabled', true);
+
+        $.ajax({
+            url: '/settings/channel_names',
+            type: 'POST',
+            data: { channel_name_mappings: JSON.stringify(mappings) },
+            success: function(response) {
+                alert('บันทึกการตั้งค่าเรียบร้อยแล้ว');
+                location.reload();
+            },
+            error: function(xhr) {
+                console.error('Error saving channel name mappings:', xhr);
+                alert('เกิดข้อผิดพลาดในการบันทึก: ' + (xhr.responseText || 'ไม่ทราบสาเหตุ'));
+                submitBtn.html(originalBtnText);
+                submitBtn.prop('disabled', false);
+            }
+        });
+    });
+
+    $('#save-settings-btn').click(function(e) {
+        e.preventDefault();
+        $('#settings-form').submit();
+    });
+
+    // เตือนเมื่อมีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก
+    let originalFormData = $('#settings-form').serialize();
+    $('#settings-form :input').on('change input', function() {
+        if ($('#settings-form').serialize() !== originalFormData) {
+            window.onbeforeunload = () => "คุณมีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก คุณแน่ใจหรือไม่ที่จะออกจากหน้านี้?";
+        } else {
+            window.onbeforeunload = null;
+        }
+    });
+    $('#settings-form').submit(() => window.onbeforeunload = null);
+
+    function setupSettingEvents() {
+        $('.delete-setting-btn').off('click').on('click', function() {
+            if (confirm('คุณแน่ใจหรือไม่ที่จะลบการตั้งค่านี้?')) {
+                $(this).closest('.name-setting').remove();
+                if ($settingsContainer.children('.name-setting').length === 0) {
+                    $('#no-settings-message').show();
+                }
+            }
+        });
+
+        $('.save-setting-name-btn').off('click').on('click', function() {
+            const $setting = $(this).closest('.name-setting');
+            const $nameInput = $setting.find('.setting-name-input');
+            const name = $nameInput.val().trim();
+
+            if (!name) {
+                $nameInput.addClass('is-invalid');
+                if ($setting.find('.invalid-feedback').length === 0) {
+                    $nameInput.after('<div class="invalid-feedback">โปรดระบุชื่อการตั้งค่า</div>');
+                }
+                return;
+            }
+
+            let isDuplicate = false;
+            $settingsContainer.find('.name-setting').not($setting).each(function() {
+                const existingName = $(this).find('.setting-name-input').val().trim();
+                if (existingName === name) {
+                    isDuplicate = true;
+                    return false;
+                }
+            });
+
+            if (isDuplicate) {
+                $nameInput.addClass('is-invalid');
+                if ($setting.find('.invalid-feedback').length === 0) {
+                    $nameInput.after('<div class="invalid-feedback">มีชื่อการตั้งค่านี้อยู่แล้ว</div>');
+                } else {
+                    $setting.find('.invalid-feedback').text('มีชื่อการตั้งค่านี้อยู่แล้ว');
+                }
+                return;
+            }
+
+            $setting.attr('data-setting-id', name);
+            $nameInput.prop('disabled', true);
+            $nameInput.removeClass('is-invalid');
+            $setting.find('.invalid-feedback').remove();
+            $(this).hide();
+            $setting.find('.setting-details').slideDown(300);
+
+            const $editBtn = $('<button type="button" class="btn btn-sm btn-outline-primary edit-setting-name-btn ms-2"><i class="fas fa-edit"></i> แก้ไขชื่อ</button>');
+            $(this).after($editBtn);
+            $editBtn.on('click', function() {
+                $nameInput.prop('disabled', false);
+                $nameInput.focus();
+                $(this).hide();
+                $setting.find('.save-setting-name-btn').show();
+            });
+        });
+
+        $('.setting-name-input').off('input').on('input', function() {
+            $(this).removeClass('is-invalid');
+            $(this).next('.invalid-feedback').remove();
+        });
+    }
+
+    function collectSettings() {
+        const mappings = [];
+        $settingsContainer.find('.name-setting').each(function() {
+            const settingId = $(this).attr('data-setting-id');
+            if (settingId === 'NEW_SETTING') {
+                return;
+            }
+            let mapping = {};
+            if ($(this).find('.setting-name-input').length > 0) {
+                mapping = {
+                    name: $(this).find('.setting-name-input').val()?.trim() || "",
+                    category_id: $(this).find('.category-select').val() || "",
+                    name_format: $(this).find('.name-format-select').val() || "full_name",
+                    custom_text: $(this).find('.custom-text-input').val()?.trim() || ""
+                };
+            } else {
+                mapping = {
+                    name: $(`input[name="name_${settingId}"]`).val()?.trim() || "",
+                    category_id: $(`select[name="${settingId}_category_id_1"]`).val() || "",
+                    name_format: $(`select[name="${settingId}_name_format"]`).val() || "full_name",
+                    custom_text: $(`input[name="${settingId}_custom_text"]`).val()?.trim() || ""
+                };
+            }
+            if (mapping.name && mapping.category_id && mapping.name_format && mapping.custom_text) {
+                mappings.push(mapping);
+            } else {
+                console.log(`ข้ามการตั้งค่า: ${mapping.name || 'ไม่มีชื่อ'} (ข้อมูลไม่ครบถ้วน)`);
+            }
+        });
+        return mappings;
+    }
+
+    setupSettingEvents();
+});
+</script>
+{% endblock %}

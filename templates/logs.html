@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+
+{% block title %}ล็อกบอท - ระบบจัดการบอท Discord{% endblock %}
+
+{% block head %}
+<style>
+    .log-level-stdout {
+        color: #6c757d;
+        font-family: monospace;
+    }
+
+    .stdout-log {
+        background-color: #f8f9fa;
+        border-left: 3px solid #6c757d;
+    }
+
+    .log-filters {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+
+    .log-container {
+        height: calc(100vh - 280px);
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        padding: 10px;
+    }
+
+    .log-entry {
+        padding: 8px;
+        margin-bottom: 5px;
+        border-radius: 3px;
+    }
+
+    .log-entry:nth-child(odd) {
+        background-color: rgba(0, 0, 0, 0.03);
+    }
+
+    .log-entry:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+    }
+
+    .log-level-info {
+        color: #0d6efd;
+    }
+
+    .log-level-warning {
+        color: #ffc107;
+    }
+
+    .log-level-error {
+        color: #dc3545;
+    }
+
+    .log-time {
+        font-size: 0.85em;
+        color: #6c757d;
+    }
+
+    .log-pagination {
+        margin-top: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="fas fa-list"></i> ล็อกบอท</h2>
+    <div>
+        <button id="refresh-logs" class="btn btn-primary">
+            <i class="fas fa-sync-alt"></i> รีเฟรช
+        </button>
+        <button id="clear-logs" class="btn btn-danger">
+            <i class="fas fa-trash"></i> ล้างล็อก
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">ล็อกระบบ</h5>
+    </div>
+    <div class="card-body">
+        <!-- ตัวกรองล็อก -->
+        <div class="log-filters">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="log-level-filter">ระดับล็อก</label>
+                        <select id="log-level-filter" class="form-select">
+                            <option value="all">ทั้งหมด</option>
+                            <option value="INFO">Info</option>
+                            <option value="WARNING">Warning</option>
+                            <option value="ERROR">Error</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label for="log-search">ค้นหา</label>
+                        <input type="text" id="log-search" class="form-control" placeholder="ค้นหาข้อความในล็อก...">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label for="log-date-filter">วันที่</label>
+                        <input type="date" id="log-date-filter" class="form-control">
+                    </div>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button id="apply-filters" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i> กรอง
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- แสดงล็อก -->
+        <div class="log-container" id="log-container">
+            <div id="logs-loading" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">กำลังโหลด...</span>
+                </div>
+                <p class="mt-2">กำลังโหลดล็อก...</p>
+            </div>
+
+            <div id="logs-content">
+                {% for log in logs %}
+                <div class="log-entry">
+                    <div class="d-flex justify-content-between">
+                        <span class="log-time">{{ log.time }}</span>
+                        <span
+                            class="badge {% if log.level == 'INFO' %}bg-info{% elif log.level == 'WARNING' %}bg-warning{% elif log.level == 'ERROR' %}bg-danger{% else %}bg-secondary{% endif %}">
+                            {{ log.level }}
+                        </span>
+                    </div>
+                    <div
+                        class="log-message {% if log.level == 'INFO' %}log-level-info{% elif log.level == 'WARNING' %}log-level-warning{% elif log.level == 'ERROR' %}log-level-error{% endif %}">
+                        {{ log.message }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div id="no-logs" class="text-center py-5" style="display: none;">
+                <i class="fas fa-info-circle fa-3x text-muted mb-3"></i>
+                <p>ไม่พบล็อกที่ตรงตามเงื่อนไข</p>
+            </div>
+        </div>
+
+        <!-- การแบ่งหน้า -->
+        <div class="log-pagination">
+            <nav>
+                <ul class="pagination justify-content-center" id="pagination">
+                    <!-- JavaScript จะสร้างปุ่มแบ่งหน้าที่นี่ -->
+                </ul>
+            </nav>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // ตัวแปรสำหรับการแบ่งหน้า
+    let currentPage = 1;
+    let totalPages = 1;
+    let logsPerPage = 50;
+    let filteredLogs = [];
+
+    // โหลดล็อกตามหน้า
+    function loadLogs(page = 1) {
+        $('#logs-loading').show();
+        $('#logs-content').hide();
+        $('#no-logs').hide();
+
+        // กรองล็อกตามเงื่อนไข
+        const levelFilter = $('#log-level-filter').val();
+        const searchQuery = $('#log-search').val().toLowerCase();
+        const dateFilter = $('#log-date-filter').val();
+
+        $.get(`/api/logs?page=${page}&per_page=${logsPerPage}`, function (data) {
+            filteredLogs = data.logs || [];
+
+            // กรองตามระดับล็อก
+            if (levelFilter !== 'all') {
+                filteredLogs = filteredLogs.filter(log => log.level === levelFilter);
+            }
+
+            // กรองตามข้อความค้นหา
+            if (searchQuery) {
+                filteredLogs = filteredLogs.filter(log =>
+                    log.message.toLowerCase().includes(searchQuery)
+                );
+            }
+
+            // กรองตามวันที่
+            if (dateFilter) {
+                const filterDate = new Date(dateFilter).toISOString().split('T')[0];
+                filteredLogs = filteredLogs.filter(log => {
+                    const logDate = new Date(log.time).toISOString().split('T')[0];
+                    return logDate === filterDate;
+                });
+            }
+
+            // แสดงผลล็อกที่กรองแล้ว
+            displayLogs(filteredLogs);
+
+            // อัปเดตการแบ่งหน้า
+            updatePagination(data.total || 0, data.page || 1, data.per_page || logsPerPage);
+
+            // ซ่อนตัวโหลด
+            $('#logs-loading').hide();
+        }).fail(function () {
+            $('#logs-loading').hide();
+            $('#logs-content').empty().html('<div class="alert alert-danger">ไม่สามารถโหลดล็อกได้ กรุณาลองอีกครั้ง</div>').show();
+        });
+    }
+
+    // แสดงล็อกในหน้า
+    function displayLogs(logs) {
+        const logsContent = $('#logs-content');
+        logsContent.empty();
+
+        if (logs.length === 0) {
+            $('#no-logs').show();
+            return;
+        }
+
+        logs.forEach(function (log) {
+            let levelClass = 'log-level-info';
+            let badgeClass = 'bg-info';
+            let isStdout = false;
+
+            if (log.message && log.message.includes('[STDOUT]')) {
+                // สำหรับล็อกที่มาจาก print statements
+                isStdout = true;
+                levelClass = 'log-level-stdout';
+                badgeClass = 'bg-dark';
+            } else if (log.level === 'WARNING') {
+                levelClass = 'log-level-warning';
+                badgeClass = 'bg-warning';
+            } else if (log.level === 'ERROR') {
+                levelClass = 'log-level-error';
+                badgeClass = 'bg-danger';
+            }
+
+            logsContent.append(`
+            <div class="log-entry ${isStdout ? 'stdout-log' : ''}">
+                <div class="d-flex justify-content-between">
+                    <span class="log-time">${log.time}</span>
+                    <span class="badge ${badgeClass}">${isStdout ? 'PRINT' : log.level}</span>
+                </div>
+                <div class="log-message ${levelClass}">
+                    ${isStdout ? log.message.replace('[STDOUT]', '').trim() : log.message}
+                </div>
+            </div>
+        `);
+        });
+
+        logsContent.show();
+    }
+
+    // อัปเดตการแบ่งหน้า
+    function updatePagination(total, currentPage, perPage) {
+        const pagination = $('#pagination');
+        pagination.empty();
+
+        totalPages = Math.ceil(total / perPage);
+        if (totalPages === 0) totalPages = 1;
+
+        // สร้างปุ่มไปหน้าแรก
+        pagination.append(`
+        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" data-page="1">
+                <i class="fas fa-angle-double-left"></i>
+            </a>
+        </li>
+    `);
+
+        // สร้างปุ่มไปหน้าก่อนหน้า
+        pagination.append(`
+        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" data-page="${currentPage - 1}">
+                <i class="fas fa-angle-left"></i>
+            </a>
+        </li>
+    `);
+
+        // สร้างปุ่มหน้า
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+
+        for (let i = startPage; i <= endPage; i++) {
+            pagination.append(`
+            <li class="page-item ${i === currentPage ? 'active' : ''}">
+                <a class="page-link" href="#" data-page="${i}">${i}</a>
+            </li>
+        `);
+        }
+
+        // สร้างปุ่มไปหน้าถัดไป
+        pagination.append(`
+        <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+            <a class="page-link" href="#" data-page="${currentPage + 1}">
+                <i class="fas fa-angle-right"></i>
+            </a>
+        </li>
+    `);
+
+        // สร้างปุ่มไปหน้าสุดท้าย
+        pagination.append(`
+        <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+            <a class="page-link" href="#" data-page="${totalPages}">
+                <i class="fas fa-angle-double-right"></i>
+            </a>
+        </li>
+    `);
+
+        // เพิ่มการจัดการเหตุการณ์คลิกปุ่มแบ่งหน้า
+        $('.page-link').click(function (e) {
+            e.preventDefault();
+            const page = $(this).data('page');
+            if (page >= 1 && page <= totalPages) {
+                currentPage = page;
+                loadLogs(currentPage);
+            }
+        });
+    }
+
+    // โหลดล็อกเมื่อโหลดหน้าเสร็จ
+    $(document).ready(function () {
+        loadLogs();
+
+        // รีเฟรชล็อก
+        $('#refresh-logs').click(function () {
+            loadLogs(currentPage);
+        });
+
+        // ล้างล็อก (ในระบบจริงต้องเชื่อมต่อกับ API)
+        $('#clear-logs').click(function () {
+            if (confirm('คุณแน่ใจหรือไม่ที่จะล้างล็อกทั้งหมด?')) {
+                alert('ฟังก์ชันนี้ยังไม่พร้อมใช้งาน');
+            }
+        });
+
+        // ใช้ตัวกรอง
+        $('#apply-filters').click(function () {
+            currentPage = 1;
+            loadLogs(currentPage);
+        });
+
+        // เมื่อกดปุ่ม Enter ในช่องค้นหา
+        $('#log-search').keypress(function (e) {
+            if (e.which === 13) {
+                currentPage = 1;
+                loadLogs(currentPage);
+            }
+        });
+
+        // ตั้งค่าปฏิทินให้ใช้งานง่าย
+        $('#log-date-filter').change(function () {
+            currentPage = 1;
+            loadLogs(currentPage);
+        });
+
+        // อัปเดตอัตโนมัติทุก 30 วินาที
+        setInterval(function () {
+            if (currentPage === 1) {
+                loadLogs(1);
+            }
+        }, 30000);
+    });
+</script>
+{% endblock %}

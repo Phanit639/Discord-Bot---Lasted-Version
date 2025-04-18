@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block title %}ตั้งค่าหมวดหมู่ - ระบบจัดการบอท Discord{% endblock %}
+
+{% block head %}
+<style>
+    .setting-card {
+        margin-bottom: 20px;
+    }
+
+    .card-header .btn-refresh {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    .category-select {
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="fas fa-folder"></i> ตั้งค่าหมวดหมู่</h2>
+    <div>
+        <button id="refresh-categories" class="btn btn-primary">
+            <i class="fas fa-sync-alt"></i> รีเฟรชหมวดหมู่
+        </button>
+        <button id="save-all-settings" class="btn btn-success">
+            <i class="fas fa-save"></i> บันทึกการตั้งค่า
+        </button>
+    </div>
+</div>
+
+<form id="settings-form" method="POST" action="/settings/categories">
+    <!-- ตั้งค่าหมวดหมู่ (Category) -->
+    <div class="row">
+        <div class="card setting-card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-folder"></i> ตั้งค่าหมวดหมู่ (Category)</h5>
+                <button type="button" id="add-category-btn" class="btn btn-sm btn-light">
+                    <i class="fas fa-plus"></i> เพิ่มหมวดหมู่
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> เลือกหมวดหมู่ที่ต้องการให้บอทย้ายช่องอัตโนมัติ
+                    และกำหนดคำสำคัญที่ใช้ในการจับคู่
+                </div>
+                <div id="category-settings-container">
+                    {% for category_name, category_data in config.category_mapping.items() %}
+                    <div class="category-settings mb-4" data-category="{{ category_name }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold">หมวดหมู่ "{{ category_name }}"</h6>
+                            <button type="button" class="btn btn-sm btn-danger delete-category-btn">
+                                <i class="fas fa-trash"></i> ลบ
+                            </button>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>หมวดหมู่หลัก:</label>
+                                <select name="{{ category_name }}_category_id_1" class="form-select category-select">
+                                    <option value="">-- เลือกหมวดหมู่ --</option>
+                                    {% for id, name in config.categories.items() %}
+                                    <option value="{{ id }}" {% if id==category_data.category_id_1 %}selected{% endif
+                                        %}>{{ name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label>หมวดหมู่สำรอง:</label>
+                                <select name="{{ category_name }}_category_id_2" class="form-select category-select">
+                                    <option value="">-- เลือกหมวดหมู่ --</option>
+                                    {% for id, name in config.categories.items() %}
+                                    <option value="{{ id }}" {% if id==category_data.category_id_2 %}selected{% endif
+                                        %}>{{ name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label>คำสำคัญสำหรับจับคู่ (แยกด้วยเครื่องหมายจุลภาค):</label>
+                            <input type="text" name="{{ category_name }}_keywords" class="form-control"
+                                value="{{ category_data.keywords|join(', ') if category_data.keywords else '' }}">
+                            <small class="form-text text-muted">เช่น "แรกน่า, แร้กน่า, แร่กน่า" -
+                                บอทจะย้ายช่องที่มีคำเหล่านี้ในชื่อ</small>
+                        </div>
+                        <hr>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div id="new-category-template" class="d-none">
+                    <div class="category-settings mb-4" data-category="NEW_CATEGORY">
+                        <div class="d-flex justify-content-between align-items-center mb-2 category-name-container">
+                            <div class="input-group" style="max-width: 50%;">
+                                <span class="input-group-text">ชื่อหมวดหมู่</span>
+                                <input type="text" class="form-control category-name-input"
+                                    placeholder="ชื่อหมวดหมู่ใหม่">
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-success save-category-name-btn">
+                                    <i class="fas fa-check"></i> บันทึกชื่อหมวดหมู่
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger delete-category-btn">
+                                    <i class="fas fa-trash"></i> ลบ
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- ส่วนที่จะซ่อนไว้ก่อน และจะแสดงหลังจากบันทึกชื่อหมวดหมู่ -->
+                        <div class="category-details" style="display: none;">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label>หมวดหมู่หลัก:</label>
+                                    <select class="form-select category-select category-id-1">
+                                        <option value="">-- เลือกหมวดหมู่ --</option>
+                                        {% for id, name in config.categories.items() %}
+                                        <option value="{{ id }}">{{ name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label>หมวดหมู่สำรอง:</label>
+                                    <select class="form-select category-select category-id-2">
+                                        <option value="">-- เลือกหมวดหมู่ --</option>
+                                        {% for id, name in config.categories.items() %}
+                                        <option value="{{ id }}">{{ name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label>คำสำคัญสำหรับจับคู่ (แยกด้วยเครื่องหมายจุลภาค):</label>
+                                <input type="text" class="form-control keywords-input" placeholder="เช่น คำ1, คำ2, คำ3">
+                                <small class="form-text text-muted">เช่น "แรกน่า, แร้กน่า, แร่กน่า" -
+                                    บอทจะย้ายช่องที่มีคำเหล่านี้ในชื่อ</small>
+                            </div>
+                        </div>
+                        <hr>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-grid gap-2 col-md-6 mx-auto my-4">
+        <button type="submit" class="btn btn-lg btn-success">
+            <i class="fas fa-save"></i> บันทึกการตั้งค่า
+        </button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function () {
+        setupCategoryEvents();
+
+        // ล้าง event handlers เดิมและเพิ่ม event handler ใหม่
+        $('#add-category-btn').off('click').on('click', function (e) {
+            e.preventDefault(); // ป้องกันการทำงานซ้ำซ้อน
+
+            // ตรวจสอบว่ามีหมวดหมู่ใหม่ที่ยังไม่ได้บันทึกชื่อหมวดหมู่หรือไม่
+            const newCategoriesNotSaved = $('#category-settings-container > .category-settings[data-category="NEW_CATEGORY"]').length;
+
+            console.log("หมวดหมู่ที่ยังไม่ได้บันทึก:", newCategoriesNotSaved);
+
+            if (newCategoriesNotSaved > 0) {
+                // ถ้ามีหมวดหมู่ที่ยังไม่บันทึกชื่อหมวดหมู่ ให้แจ้งเตือนผู้ใช้
+                alert('กรุณาบันทึกชื่อหมวดหมู่ที่กำลังสร้างอยู่ก่อนเพิ่มหมวดหมู่ใหม่');
+
+                // โฟกัสที่ช่องกรอกชื่อหมวดหมู่ที่ยังไม่ได้บันทึก
+                $('#category-settings-container > .category-settings[data-category="NEW_CATEGORY"]').first().find('.category-name-input').focus();
+                return;
+            }
+
+            const template = $('#new-category-template').html();
+            $('#category-settings-container').append(template);
+
+            // เลื่อนไปยังหมวดหมู่ใหม่ที่เพิ่มเข้ามา
+            const newCategory = $('#category-settings-container > .category-settings').last();
+            $('html, body').animate({
+                scrollTop: newCategory.offset().top - 100
+            }, 500);
+
+            // โฟกัสที่ input ชื่อหมวดหมู่เพื่อให้ผู้ใช้เริ่มกรอกได้ทันที
+            newCategory.find('.category-name-input').focus();
+
+            setupCategoryEvents();
+        });
+
+        $('#settings-form').submit(function (e) {
+            e.preventDefault();
+
+            // เก็บข้อมูลจากฟอร์ม
+            const categoryMapping = collectCategoryMapping();
+
+            // แสดงข้อมูลที่จะส่งในคอนโซลเพื่อตรวจสอบความถูกต้อง
+            console.log("Category mapping to send:", categoryMapping);
+
+            // สร้าง loading indicator
+            const submitBtn = $(this).find('button[type="submit"]');
+            const originalBtnText = submitBtn.html();
+            submitBtn.html('<i class="fas fa-spinner fa-spin"></i> กำลังบันทึก...');
+            submitBtn.prop('disabled', true);
+
+            // ส่งข้อมูลไปยังเซิร์ฟเวอร์
+            $.ajax({
+                url: '/settings/categories',
+                type: 'POST',
+                data: {
+                    category_mapping: JSON.stringify(categoryMapping)
+                },
+                success: function (response) {
+                    // แสดงข้อความสำเร็จ
+                    alert('บันทึกการตั้งค่าเรียบร้อยแล้ว');
+
+                    // รีโหลดหน้าเพื่อแสดงข้อมูลที่อัปเดตแล้ว
+                    location.reload();
+                },
+                error: function (xhr) {
+                    // แสดงข้อความผิดพลาด
+                    alert('เกิดข้อผิดพลาดในการบันทึก: ' + xhr.responseText);
+                    console.error('Error saving settings:', xhr);
+
+                    // คืนค่าปุ่มกลับเป็นค่าเดิม
+                    submitBtn.html(originalBtnText);
+                    submitBtn.prop('disabled', false);
+                }
+            });
+        });
+
+        function setupCategoryEvents() {
+            // จัดการกับปุ่มลบหมวดหมู่
+            $('.delete-category-btn').off('click').on('click', function () {
+                if (confirm('คุณแน่ใจหรือไม่ที่จะลบหมวดหมู่นี้?')) {
+                    $(this).closest('.category-settings').remove();
+                }
+            });
+
+            // จัดการกับการบันทึกชื่อหมวดหมู่ใหม่
+            $('.save-category-name-btn').off('click').on('click', function () {
+                const categorySettings = $(this).closest('.category-settings');
+                const nameInput = categorySettings.find('.category-name-input');
+                const categoryName = nameInput.val().trim();
+
+                if (!categoryName) {
+                    // แสดงข้อความแจ้งเตือนถ้าไม่มีชื่อหมวดหมู่
+                    nameInput.addClass('is-invalid');
+                    if (categorySettings.find('.invalid-feedback').length === 0) {
+                        nameInput.after('<div class="invalid-feedback">โปรดระบุชื่อหมวดหมู่</div>');
+                    }
+                    return;
+                }
+
+                // ตรวจสอบว่าชื่อหมวดหมู่ซ้ำหรือไม่
+                let isDuplicate = false;
+                $('.category-settings').not(categorySettings).each(function () {
+                    const existingCategory = $(this).attr('data-category');
+                    if (existingCategory === categoryName) {
+                        isDuplicate = true;
+                        return false; // ออกจาก each loop
+                    }
+                });
+
+                if (isDuplicate) {
+                    nameInput.addClass('is-invalid');
+                    if (categorySettings.find('.invalid-feedback').length === 0) {
+                        nameInput.after('<div class="invalid-feedback">มีหมวดหมู่นี้อยู่แล้ว</div>');
+                    } else {
+                        categorySettings.find('.invalid-feedback').text('มีหมวดหมู่นี้อยู่แล้ว');
+                    }
+                    return;
+                }
+
+                // บันทึกชื่อหมวดหมู่
+                categorySettings.attr('data-category', categoryName);
+
+                // เปลี่ยนรูปแบบการแสดงผล
+                nameInput.prop('disabled', true);
+                nameInput.removeClass('is-invalid');
+                categorySettings.find('.invalid-feedback').remove();
+                $(this).hide();
+
+                // แสดงส่วนที่ซ่อนไว้
+                categorySettings.find('.category-details').slideDown(300);
+
+                // เพิ่มปุ่มแก้ไขชื่อหมวดหมู่
+                const editBtn = $('<button type="button" class="btn btn-sm btn-outline-primary edit-category-name-btn ms-2"><i class="fas fa-edit"></i> แก้ไขชื่อ</button>');
+                $(this).after(editBtn);
+
+                // เพิ่ม event handler สำหรับปุ่มแก้ไขชื่อหมวดหมู่
+                editBtn.on('click', function () {
+                    nameInput.prop('disabled', false);
+                    nameInput.focus();
+                    $(this).hide();
+                    $('.save-category-name-btn').show();
+                });
+            });
+
+            // จัดการกับการเปลี่ยนชื่อหมวดหมู่ที่มีอยู่แล้ว
+            $('.category-name-input').off('input').on('input', function () {
+                $(this).removeClass('is-invalid');
+                $(this).next('.invalid-feedback').remove();
+            });
+        }
+
+        function collectCategoryMapping() {
+            const mapping = {};
+            $('.category-settings').each(function () {
+                const category = $(this).attr('data-category');
+                // ข้ามหมวดหมู่ใหม่ที่ยังไม่ได้บันทึกชื่อ
+                if (category === 'NEW_CATEGORY') {
+                    return;
+                }
+
+                // เช็คว่าเป็นหมวดหมู่ใหม่ที่มีการบันทึกชื่อแล้วหรือไม่
+                if ($(this).find('.category-id-1').length > 0) {
+                    // หมวดหมู่ใหม่ที่บันทึกชื่อแล้ว
+                    mapping[category] = {
+                        category_id_1: $(this).find('.category-id-1').val(),
+                        category_id_2: $(this).find('.category-id-2').val(),
+                        keywords: $(this).find('.keywords-input').val().split(',').map(k => k.trim()).filter(k => k)
+                    };
+                } else {
+                    // หมวดหมู่เดิม
+                    mapping[category] = {
+                        category_id_1: $(`select[name="${category}_category_id_1"]`).val(),
+                        category_id_2: $(`select[name="${category}_category_id_2"]`).val(),
+                        keywords: $(`input[name="${category}_keywords"]`).val().split(',').map(k => k.trim()).filter(k => k)
+                    };
+                }
+            });
+            return mapping;
+        }
+
+        $('#refresh-categories').click(function (e) {
+            e.preventDefault();
+            const button = $(this);
+            const originalText = button.html();
+            button.html('<i class="fas fa-spinner fa-spin"></i> กำลังรีเฟรช...');
+            button.prop('disabled', true);
+            $.ajax({
+                url: '/api/categories/refresh',
+                type: 'POST',
+                success: function (response) {
+                    if (response.success) {
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        alert('เกิดข้อผิดพลาด: ' + response.message);
+                        button.html(originalText);
+                        button.prop('disabled', false);
+                    }
+                },
+                error: function (xhr) {
+                    alert('เกิดข้อผิดพลาดในการรีเฟรชหมวดหมู่: ' + xhr.statusText);
+                    button.html(originalText);
+                    button.prop('disabled', false);
+                }
+            });
+        });
+
+        $('#save-all-settings').click(function (e) {
+            e.preventDefault();
+            $('#settings-form').submit();
+        });
+
+        let originalFormData = $('#settings-form').serialize();
+        $('#settings-form :input').on('change input', function () {
+            if ($('#settings-form').serialize() !== originalFormData) {
+                window.onbeforeunload = () => "คุณมีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก คุณแน่ใจหรือไม่ที่จะออกจากหน้านี้?";
+            } else {
+                window.onbeforeunload = null;
+            }
+        });
+        $('#settings-form').submit(() => window.onbeforeunload = null);
+    });
+</script>
+{% endblock %}

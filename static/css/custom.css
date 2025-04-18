@@ -1,0 +1,75 @@
+/* เพิ่มสไตล์พิเศษตามต้องการ */
+body {
+    font-family: 'Prompt', sans-serif;
+}
+
+.thai-font {
+    font-family: 'Sarabun', sans-serif;
+}
+
+/* สไตล์สำหรับการรองรับภาษาไทย */
+@font-face {
+    font-family: 'Prompt';
+    src: url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap');
+}
+
+@font-face {
+    font-family: 'Sarabun';
+    src: url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap');
+}
+
+/* สไตล์เพิ่มเติมสำหรับล็อก */
+.log-container {
+    border: 1px solid #e5e5e5;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.05);
+}
+
+.log-entry {
+    transition: all 0.3s ease;
+}
+
+.log-entry:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+/* สไตล์สำหรับหน้าตั้งค่า */
+.setting-card {
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.setting-card:hover {
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+}
+
+.message-preview {
+    border-left: 4px solid #007bff;
+}
+
+/* สไตล์เพิ่มเติมสำหรับการแสดงผลที่ดีขึ้น */
+.nav-link.active {
+    font-weight: 600;
+}
+
+.btn-primary {
+    background-color: #0069d9;
+    border-color: #0062cc;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #004fa3;
+}
+
+/* สไตล์สำหรับ loader */
+.spinner-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.custom-spinner {
+    width: 3rem;
+    height: 3rem;
+}

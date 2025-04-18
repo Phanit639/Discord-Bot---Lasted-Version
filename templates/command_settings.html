@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block title %}ตั้งค่าคำสั่ง - ระบบจัดการบอท Discord{% endblock %}
+
+{% block head %}
+<style>
+    .setting-card {
+        margin-bottom: 20px;
+    }
+
+    .card-header .btn-refresh {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="fas fa-terminal"></i> ตั้งค่าคำสั่ง</h2>
+    <div>
+        <button id="save-all-settings" class="btn btn-success">
+            <i class="fas fa-save"></i> บันทึกการตั้งค่า
+        </button>
+    </div>
+</div>
+
+<form id="settings-form" method="POST" action="/settings/commands">
+    <!-- ตั้งค่าคำสั่ง -->
+    <div class="row">
+        <div class="card setting-card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-terminal"></i> ตั้งค่าคำสั่ง (Commands)</h5>
+                <button type="button" id="add-command-btn" class="btn btn-sm btn-light">
+                    <i class="fas fa-plus"></i> เพิ่มคำสั่ง
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> กรอกชื่อคำสั่งโดยไม่ต้องใส่ "!" (เช่น "ทดสอบ") เมื่อใช้ใน Discord
+                    จะเป็น "!ทดสอบ"
+                </div>
+                <div id="command-settings-container">
+                    {% for command_name, command_data in config.messages.items() %}
+                    <div class="command-settings mb-4" data-command="{{ command_name }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold">คำสั่ง "!{{ command_name }}"</h6>
+                            <button type="button" class="btn btn-sm btn-danger delete-command-btn">
+                                <i class="fas fa-trash"></i> ลบ
+                            </button>
+                        </div>
+                        <div class="mb-3">
+                            <label>ข้อความตอบกลับ:</label>
+                            <textarea name="{{ command_name }}_text" class="form-control"
+                                rows="3">{{ command_data.text }}</textarea>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" name="{{ command_name }}_change_channel" {% 
+                                if command_data.change_channel %}checked{% endif %}>
+                            <label class="form-check-label">เปลี่ยนชื่อช่องตามคำสั่ง (เช่น ชื่อเดิม-{{ command_name
+                                }})</label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input"
+                                name="{{ command_name }}_allow_additional_text" {% if
+                                command_data.allow_additional_text|default(False) %}checked{% endif %}>
+                            <label class="form-check-label">อนุญาตให้เพิ่มข้อความพิเศษ (เช่น ชื่อเดิม-ข้อความ-{{
+                                command_name }})</label>
+                        </div>
+                        <hr>
+                    </div>
+                    {% endfor %}
+                </div>
+                <!-- แก้ไขส่วน Template ของคำสั่งใหม่ -->
+                <div id="new-command-template" class="d-none">
+                    <div class="command-settings mb-4" data-command="NEW_COMMAND">
+                        <div class="d-flex justify-content-between align-items-center mb-2 command-name-container">
+                            <div class="input-group" style="max-width: 50%;">
+                                <span class="input-group-text">ชื่อคำสั่ง</span>
+                                <input type="text" class="form-control command-name-input" placeholder="เช่น ทดสอบ">
+                            </div>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-success save-command-name-btn">
+                                    <i class="fas fa-check"></i> บันทึกชื่อคำสั่ง
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger delete-command-btn">
+                                    <i class="fas fa-trash"></i> ลบ
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- ส่วนที่จะซ่อนไว้ก่อน และจะแสดงหลังจากบันทึกชื่อคำสั่ง -->
+                        <div class="command-details" style="display: none;">
+                            <div class="mb-3">
+                                <label>ข้อความตอบกลับ:</label>
+                                <textarea class="form-control command-text-input" rows="3"
+                                    placeholder="ข้อความที่บอทจะตอบกลับ"></textarea>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input type="checkbox" class="form-check-input command-change-channel-input">
+                                <label class="form-check-label">เปลี่ยนชื่อช่องตามคำสั่ง</label>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input type="checkbox" class="form-check-input command-allow-additional-text-input">
+                                <label class="form-check-label">อนุญาตให้เพิ่มข้อความพิเศษ</label>
+                            </div>
+                        </div>
+                        <hr>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-grid gap-2 col-md-6 mx-auto my-4">
+        <button type="submit" class="btn btn-lg btn-success">
+            <i class="fas fa-save"></i> บันทึกการตั้งค่า
+        </button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function () {
+        setupCommandEvents();
+
+        // ล้าง event handlers เดิมและเพิ่ม event handler ใหม่สำหรับปุ่มเพิ่มคำสั่ง
+        $('#add-command-btn').off('click').on('click', function (e) {
+            e.preventDefault(); // ป้องกันการทำงานซ้ำซ้อน
+
+            // ตรวจสอบว่ามีคำสั่งใหม่ที่ยังไม่ได้บันทึกชื่อคำสั่งหรือไม่
+            // เฉพาะคำสั่งที่อยู่ในพื้นที่แสดงผลจริง ไม่รวมใน template
+            const newCommandsNotSaved = $('#command-settings-container > .command-settings[data-command="NEW_COMMAND"]').length;
+
+            console.log("คำสั่งที่ยังไม่ได้บันทึก:", newCommandsNotSaved);
+
+            if (newCommandsNotSaved > 0) {
+                // ถ้ามีคำสั่งที่ยังไม่บันทึกชื่อคำสั่ง ให้แจ้งเตือนผู้ใช้
+                alert('กรุณาบันทึกชื่อคำสั่งที่กำลังสร้างอยู่ก่อนเพิ่มคำสั่งใหม่');
+
+                // โฟกัสที่ช่องกรอกชื่อคำสั่งที่ยังไม่ได้บันทึก
+                $('#command-settings-container > .command-settings[data-command="NEW_COMMAND"]').first().find('.command-name-input').focus();
+                return;
+            }
+
+            // คัดลอก template จาก HTML
+            const template = $('#new-command-template').html();
+
+            // เพิ่ม template เข้าไปในส่วนแสดงคำสั่ง
+            $('#command-settings-container').append(template);
+
+            // เพิ่ม event handlers
+            setupCommandEvents();
+
+            // เลื่อนไปยังคำสั่งใหม่ที่เพิ่มเข้ามา
+            const newCommand = $('#command-settings-container > .command-settings').last();
+            $('html, body').animate({
+                scrollTop: newCommand.offset().top - 100
+            }, 500);
+
+            // โฟกัสที่ input ชื่อคำสั่งเพื่อให้ผู้ใช้เริ่มกรอกได้ทันที
+            newCommand.find('.command-name-input').focus();
+        });
+
+        $('#settings-form').submit(function (e) {
+            e.preventDefault();
+
+            // เก็บข้อมูลจากฟอร์ม
+            const messages = collectMessages();
+
+            // แสดงข้อมูลที่จะส่งในคอนโซลเพื่อตรวจสอบความถูกต้อง
+            console.log("Messages to send:", messages);
+
+            // สร้าง loading indicator
+            const submitBtn = $(this).find('button[type="submit"]');
+            const originalBtnText = submitBtn.html();
+            submitBtn.html('<i class="fas fa-spinner fa-spin"></i> กำลังบันทึก...');
+            submitBtn.prop('disabled', true);
+
+            // ส่งข้อมูลไปยังเซิร์ฟเวอร์
+            $.ajax({
+                url: '/settings/commands',
+                type: 'POST',
+                data: {
+                    messages: JSON.stringify(messages)
+                },
+                success: function (response) {
+                    // แสดงข้อความสำเร็จ
+                    alert('บันทึกการตั้งค่าเรียบร้อยแล้ว');
+
+                    // รีโหลดหน้าเพื่อแสดงข้อมูลที่อัปเดตแล้ว
+                    location.reload();
+                },
+                error: function (xhr) {
+                    // แสดงข้อความผิดพลาด
+                    alert('เกิดข้อผิดพลาดในการบันทึก: ' + xhr.responseText);
+                    console.error('Error saving settings:', xhr);
+
+                    // คืนค่าปุ่มกลับเป็นค่าเดิม
+                    submitBtn.html(originalBtnText);
+                    submitBtn.prop('disabled', false);
+                }
+            });
+        });
+
+        // ฟังก์ชันสำหรับตั้งค่า event handlers
+        function setupCommandEvents() {
+            // จัดการกับปุ่มลบคำสั่ง
+            $('.delete-command-btn').off('click').on('click', function () {
+                if (confirm('คุณแน่ใจหรือไม่ที่จะลบคำสั่งนี้?')) {
+                    $(this).closest('.command-settings').remove();
+                }
+            });
+
+            // จัดการกับการบันทึกชื่อคำสั่งใหม่
+            $('.save-command-name-btn').off('click').on('click', function () {
+                const commandSettings = $(this).closest('.command-settings');
+                const nameInput = commandSettings.find('.command-name-input');
+                const commandName = nameInput.val().trim();
+
+                if (!commandName) {
+                    // แสดงข้อความแจ้งเตือนถ้าไม่มีชื่อคำสั่ง
+                    nameInput.addClass('is-invalid');
+                    if (commandSettings.find('.invalid-feedback').length === 0) {
+                        nameInput.after('<div class="invalid-feedback">โปรดระบุชื่อคำสั่ง</div>');
+                    }
+                    return;
+                }
+
+                // ตรวจสอบว่าชื่อคำสั่งซ้ำหรือไม่
+                let isDuplicate = false;
+                $('.command-settings').not(commandSettings).each(function () {
+                    const existingCommand = $(this).attr('data-command');
+                    if (existingCommand === commandName) {
+                        isDuplicate = true;
+                        return false; // ออกจาก each loop
+                    }
+                });
+
+                if (isDuplicate) {
+                    nameInput.addClass('is-invalid');
+                    if (commandSettings.find('.invalid-feedback').length === 0) {
+                        nameInput.after('<div class="invalid-feedback">มีคำสั่งนี้อยู่แล้ว</div>');
+                    } else {
+                        commandSettings.find('.invalid-feedback').text('มีคำสั่งนี้อยู่แล้ว');
+                    }
+                    return;
+                }
+
+                // บันทึกชื่อคำสั่ง
+                commandSettings.attr('data-command', commandName);
+
+                // เปลี่ยนรูปแบบการแสดงผล
+                nameInput.prop('disabled', true);
+                nameInput.removeClass('is-invalid');
+                commandSettings.find('.invalid-feedback').remove();
+                $(this).hide();
+
+                // แสดงส่วนที่ซ่อนไว้
+                commandSettings.find('.command-details').slideDown(300);
+
+                // เพิ่มปุ่มแก้ไขชื่อคำสั่ง
+                const editBtn = $('<button type="button" class="btn btn-sm btn-outline-primary edit-command-name-btn ms-2"><i class="fas fa-edit"></i> แก้ไขชื่อ</button>');
+                $(this).after(editBtn);
+
+                // เพิ่ม event handler สำหรับปุ่มแก้ไขชื่อคำสั่ง
+                editBtn.on('click', function () {
+                    nameInput.prop('disabled', false);
+                    nameInput.focus();
+                    $(this).hide();
+                    $('.save-command-name-btn').show();
+                });
+            });
+
+            // จัดการกับการเปลี่ยนชื่อคำสั่งที่มีอยู่แล้ว
+            $('.command-name-input').off('input').on('input', function () {
+                $(this).removeClass('is-invalid');
+                $(this).next('.invalid-feedback').remove();
+            });
+        }
+
+        function collectMessages() {
+            const messages = {};
+
+            // จัดการคำสั่งที่มีอยู่เดิมที่มี name attribute
+            $('.command-settings:not([data-command="NEW_COMMAND"])').each(function () {
+                const command = $(this).attr('data-command');
+                if (command) {
+                    // ตรวจสอบว่าเป็นคำสั่งเดิมหรือคำสั่งใหม่ที่บันทึกชื่อแล้ว
+                    if ($(this).find('.command-text-input').length > 0) {
+                        // คำสั่งใหม่ที่บันทึกชื่อแล้ว
+                        messages[command] = {
+                            text: $(this).find('.command-text-input').val() || "",
+                            change_channel: $(this).find('.command-change-channel-input').prop('checked'),
+                            allow_additional_text: $(this).find('.command-allow-additional-text-input').prop('checked')
+                        };
+                    } else {
+                        // คำสั่งเดิม
+                        messages[command] = {
+                            text: $(`textarea[name="${command}_text"]`).val() || "",
+                            change_channel: $(`input[name="${command}_change_channel"]`).prop('checked'),
+                            allow_additional_text: $(`input[name="${command}_allow_additional_text"]`).prop('checked')
+                        };
+                    }
+                }
+            });
+
+            return messages;
+        }
+
+        $('#save-all-settings').click(function (e) {
+            e.preventDefault();
+            $('#settings-form').submit();
+        });
+
+        let originalFormData = $('#settings-form').serialize();
+        $('#settings-form :input').on('change input', function () {
+            if ($('#settings-form').serialize() !== originalFormData) {
+                window.onbeforeunload = () => "คุณมีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก คุณแน่ใจหรือไม่ที่จะออกจากหน้านี้?";
+            } else {
+                window.onbeforeunload = null;
+            }
+        });
+        $('#settings-form').submit(() => window.onbeforeunload = null);
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}หน้าแรก - ระบบจัดการบอท Discord{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="fas fa-tachometer-alt"></i> แดชบอร์ด</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="card bg-primary text-white mb-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h5 class="card-title mb-0">สถานะบอท</h5>
+                                        <p class="card-text" id="bot-status">กำลังตรวจสอบ...</p>
+                                    </div>
+                                    <i class="fas fa-robot fa-3x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-success text-white mb-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h5 class="card-title mb-0">ช่องทั้งหมด</h5>
+                                        <p class="card-text" id="channels-count">กำลังโหลด...</p>
+                                    </div>
+                                    <i class="fas fa-hashtag fa-3x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-info text-white mb-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h5 class="card-title mb-0">หมวดหมู่</h5>
+                                        <p class="card-text" id="categories-count">กำลังโหลด...</p>
+                                    </div>
+                                    <i class="fas fa-folder fa-3x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-list"></i> ล็อกล่าสุด</h5>
+            </div>
+            <div class="card-body">
+                <div id="recent-logs" style="max-height: 300px; overflow-y: auto;">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">กำลังโหลด...</span>
+                        </div>
+                        <p>กำลังโหลดล็อกล่าสุด...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <a href="/logs" class="btn btn-primary btn-sm">ดูล็อกทั้งหมด</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-cog"></i> การตั้งค่าทั่วไป</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6>หมวดหมู่ที่ตั้งค่า</h6>
+                    <ul class="list-group" id="configured-categories">
+                        <li class="list-group-item text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">กำลังโหลด...</span>
+                            </div>
+                            กำลังโหลดข้อมูลหมวดหมู่...
+                        </li>
+                    </ul>
+                </div>
+                <div class="d-grid">
+                    <a href="/settings" class="btn btn-primary">ไปยังหน้าตั้งค่า</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // โหลดล็อกล่าสุดเมื่อโหลดหน้าเสร็จ
+    $(document).ready(function () {
+        // โหลดล็อกล่าสุด
+        $.get('/api/logs?page=1&per_page=10', function (data) {
+            const logsContainer = $('#recent-logs');
+            logsContainer.empty();
+
+            if (data.logs && data.logs.length === 0) {
+                logsContainer.html('<p class="text-center">ไม่พบล็อก</p>');
+                return;
+            }
+
+            if (data.logs) {
+                data.logs.forEach(function (log) {
+                    let logClass = 'log-info';
+                    if (log.level === 'WARNING') {
+                        logClass = 'log-warning';
+                    } else if (log.level === 'ERROR') {
+                        logClass = 'log-error';
+                    }
+
+                    logsContainer.append(`
+                    <div class="log-entry">
+                        <small class="text-muted">${log.time}</small>
+                        <div class="${logClass}">${log.message}</div>
+                    </div>
+                `);
+                });
+            } else {
+                logsContainer.html('<p class="text-center">ไม่สามารถโหลดล็อกได้</p>');
+            }
+        }).fail(function () {
+            $('#recent-logs').html('<p class="text-center text-danger">ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์</p>');
+        });
+
+        // ฟังก์ชันสำหรับอัปเดตสถานะ
+        function updateStatus() {
+            // สถานะบอท
+            $.get('/api/server-status', function (data) {
+                if (data.online) {
+                    $('#bot-status').text('ออนไลน์').addClass('text-success');
+                } else {
+                    $('#bot-status').text('ออฟไลน์').addClass('text-danger');
+                }
+            }).fail(function () {
+                $('#bot-status').text('ไม่สามารถตรวจสอบ').addClass('text-warning');
+            });
+
+            // โหลดข้อมูลหมวดหมู่
+            $.get('/api/categories', function (data) {
+                const categoriesCount = Object.keys(data).length;
+                $('#categories-count').text(categoriesCount);
+
+                // อัปเดตรายการหมวดหมู่ที่ตั้งค่า
+                const categoriesContainer = $('#configured-categories');
+                categoriesContainer.empty();
+
+                if (categoriesCount === 0) {
+                    categoriesContainer.append(`
+                    <li class="list-group-item text-center">ไม่พบข้อมูลหมวดหมู่</li>
+                `);
+                } else {
+                    // แสดงตัวอย่าง 3 หมวดหมู่แรก
+                    let count = 0;
+                    for (const [id, name] of Object.entries(data)) {
+                        if (count < 3) {
+                            categoriesContainer.append(`
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                ${name}
+                                <span class="badge bg-primary">${id}</span>
+                            </li>
+                        `);
+                            count++;
+                        }
+                    }
+
+                    if (categoriesCount > 3) {
+                        categoriesContainer.append(`
+                        <li class="list-group-item text-center">
+                            <a href="/settings">ดูทั้งหมด ${categoriesCount} หมวดหมู่</a>
+                        </li>
+                    `);
+                    }
+                }
+            }).fail(function () {
+                $('#categories-count').text('ไม่สามารถโหลด');
+                $('#configured-categories').html(`
+                <li class="list-group-item text-center text-danger">ไม่สามารถโหลดข้อมูลหมวดหมู่</li>
+            `);
+            });
+
+            // โหลดข้อมูลจำนวนช่อง
+            $.get('/api/channels/count', function (data) {
+                if (data.success) {
+                    $('#channels-count').text(data.text_channels_count);
+                } else {
+                    $('#channels-count').text('ไม่สามารถโหลดได้');
+                }
+            }).fail(function () {
+                $('#channels-count').text('ไม่สามารถโหลดได้');
+            });
+        }
+
+        // อัปเดตสถานะในครั้งแรก
+        updateStatus();
+
+        // อัปเดตทุก 30 วินาที
+        setInterval(updateStatus, 30000);
+    });
+</script>
+{% endblock %}

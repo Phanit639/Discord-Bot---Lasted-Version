@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ระบบจัดการบอท Discord{% endblock %}</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .btn-discord {
+            background-color: #7289DA;
+            color: white;
+        }
+
+        .btn-discord:hover {
+            background-color: #5f73bc;
+            color: white;
+        }
+
+        .server-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .server-icon-lg {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .default-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background-color: #7289DA;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            margin: 0 auto;
+        }
+
+        .default-icon-lg {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background-color: #7289DA;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+        }
+
+        .disabled-card {
+            opacity: 0.7;
+        }
+
+        .content {
+            flex: 1;
+        }
+
+        .sidebar {
+            min-height: calc(100vh - 56px);
+            background-color: #f8f9fa;
+            padding-top: 20px;
+        }
+
+        .sidebar .nav-link {
+            color: #333;
+            border-radius: 0;
+        }
+
+        .sidebar .nav-link.active {
+            background-color: #0d6efd;
+            color: white;
+        }
+
+        .sidebar .nav-link:hover {
+            background-color: #e9ecef;
+        }
+
+        .nav-link i {
+            margin-right: 8px;
+        }
+
+        .log-entry {
+            border-bottom: 1px solid #eee;
+            padding: 8px 0;
+        }
+
+        .log-info {
+            color: #0d6efd;
+        }
+
+        .log-warning {
+            color: #ffc107;
+        }
+
+        .log-error {
+            color: #dc3545;
+        }
+
+        .settings-card {
+            margin-bottom: 20px;
+        }
+
+        footer {
+            margin-top: auto;
+            padding: 10px 0;
+            background-color: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fab fa-discord"></i> ระบบจัดการบอท Discord
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/chat"><i class="fas fa-comment-dots"></i> สนทนากับบอท</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/"><i class="fas fa-home"></i> หน้าแรก</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/logs"><i class="fas fa-list"></i> ล็อก</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/settings"><i class="fas fa-cog"></i> ตั้งค่า</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/system_monitor"><i class="fas fa-desktop"></i> ตรวจสอบระบบ</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid content">
+        <div class="row">
+            <!-- Sidebar -->
+            <div class="col-md-2 d-none d-md-block sidebar">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
+                            <i class="fas fa-home"></i> หน้าแรก
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/chat' %}active{% endif %}" href="/chat">
+                            <i class="fas fa-comment-dots"></i> สนทนากับบอท
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/logs' %}active{% endif %}" href="/logs">
+                            <i class="fas fa-list"></i> ล็อกบอท
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/settings' %}active{% endif %}" href="/settings">
+                            <i class="fas fa-cog"></i> ตั้งค่าทั่วไป
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/settings/categories' %}active{% endif %}" href="/settings/categories">
+                            <i class="fas fa-folder"></i> ตั้งค่าหมวดหมู่
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/settings/commands' %}active{% endif %}" href="/settings/commands">
+                            <i class="fas fa-terminal"></i> ตั้งค่าคำสั่ง
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/settings/intents' %}active{% endif %}" href="/settings/intents">
+                            <i class="fas fa-brain"></i> ตั้งค่าเจตนา
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/settings/channel_names' %}active{% endif %}" href="/settings/channel_names">
+                            <i class="fas fa-edit"></i> จัดการชื่อช่อง
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/settings/roles' %}active{% endif %}" href="/settings/roles">
+                            <i class="fas fa-shield-alt"></i> จัดการยศ
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/settings/welcome_messages' %}active{% endif %}" href="/settings/welcome_messages">
+                            <i class="fas fa-comment-dots"></i> ตั้งค่าข้อความต้อนรับ
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/system_monitor' %}active{% endif %}" href="/system_monitor">
+                            <i class="fas fa-desktop"></i> ตรวจสอบระบบ
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Main Content -->
+            <main class="col-md-10 ms-sm-auto px-4 py-3">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+                {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center py-3">
+        <div class="container">
+            <p class="mb-0">Discord Bot Management System &copy; {{ now.year if now else 2023 }} | เวอร์ชัน 1.0.0</p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>
