@@ -63,6 +63,12 @@
     .log-pagination {
         margin-top: 20px;
     }
+
+    .pagination-info {
+        margin-top: 10px;
+        font-size: 0.9em;
+        color: #6c757d;
+    }
 </style>
 {% endblock %}
 
@@ -72,9 +78,6 @@
     <div>
         <button id="refresh-logs" class="btn btn-primary">
             <i class="fas fa-sync-alt"></i> รีเฟรช
-        </button>
-        <button id="clear-logs" class="btn btn-danger">
-            <i class="fas fa-trash"></i> ล้างล็อก
         </button>
     </div>
 </div>
@@ -158,6 +161,9 @@
                     <!-- JavaScript จะสร้างปุ่มแบ่งหน้าที่นี่ -->
                 </ul>
             </nav>
+            <div class="pagination-info text-center" id="pagination-info">
+                <!-- ข้อมูลหน้าและจำนวนล็อกทั้งหมดจะแสดงที่นี่ -->
+            </div>
         </div>
     </div>
 </div>
@@ -183,6 +189,7 @@
         const dateFilter = $('#log-date-filter').val();
 
         $.get(`/api/logs?page=${page}&per_page=${logsPerPage}`, function (data) {
+            console.log('API Response:', data); // ดีบักข้อมูลจาก API
             filteredLogs = data.logs || [];
 
             // กรองตามระดับล็อก
@@ -214,7 +221,8 @@
 
             // ซ่อนตัวโหลด
             $('#logs-loading').hide();
-        }).fail(function () {
+        }).fail(function (xhr) {
+            console.error('Error loading logs:', xhr);
             $('#logs-loading').hide();
             $('#logs-content').empty().html('<div class="alert alert-danger">ไม่สามารถโหลดล็อกได้ กรุณาลองอีกครั้ง</div>').show();
         });
@@ -269,8 +277,16 @@
         const pagination = $('#pagination');
         pagination.empty();
 
-        totalPages = Math.ceil(total / perPage);
-        if (totalPages === 0) totalPages = 1;
+        totalPages = Math.ceil(total / perPage) || 1;
+        console.log(`Total Logs: ${total}, Per Page: ${perPage}, Total Pages: ${totalPages}, Current Page: ${currentPage}`);
+
+        // อัปเดตข้อมูลหน้า
+        $('#pagination-info').text(`หน้า ${currentPage} จาก ${totalPages} (ทั้งหมด ${total} ล็อก)`);
+
+        if (totalPages === 1) {
+            pagination.append('<li class="page-item disabled"><span class="page-link">ไม่มีหน้าอื่น</span></li>');
+            return;
+        }
 
         // สร้างปุ่มไปหน้าแรก
         pagination.append(`
@@ -319,16 +335,6 @@
             </a>
         </li>
     `);
-
-        // เพิ่มการจัดการเหตุการณ์คลิกปุ่มแบ่งหน้า
-        $('.page-link').click(function (e) {
-            e.preventDefault();
-            const page = $(this).data('page');
-            if (page >= 1 && page <= totalPages) {
-                currentPage = page;
-                loadLogs(currentPage);
-            }
-        });
     }
 
     // โหลดล็อกเมื่อโหลดหน้าเสร็จ
@@ -338,13 +344,6 @@
         // รีเฟรชล็อก
         $('#refresh-logs').click(function () {
             loadLogs(currentPage);
-        });
-
-        // ล้างล็อก (ในระบบจริงต้องเชื่อมต่อกับ API)
-        $('#clear-logs').click(function () {
-            if (confirm('คุณแน่ใจหรือไม่ที่จะล้างล็อกทั้งหมด?')) {
-                alert('ฟังก์ชันนี้ยังไม่พร้อมใช้งาน');
-            }
         });
 
         // ใช้ตัวกรอง
@@ -373,6 +372,17 @@
                 loadLogs(1);
             }
         }, 30000);
+
+        // จัดการคลิกปุ่มแบ่งหน้าแบบ delegate
+        $('#pagination').on('click', '.page-link', function (e) {
+            e.preventDefault();
+            const page = $(this).data('page');
+            console.log('Clicked page:', page); // ดีบักการคลิก
+            if (page >= 1 && page <= totalPages) {
+                currentPage = page;
+                loadLogs(currentPage);
+            }
+        });
     });
 </script>
 {% endblock %}

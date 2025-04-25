@@ -20,8 +20,7 @@ from slip_processor import process_slip_image
 import qrcode
 from io import BytesIO
 import base64
-from PIL import Image
-import psutil  # เพิ่มการนำเข้า psutil
+import psutil
 
 # ตั้งค่า locale ให้รองรับภาษาไทย
 try:
@@ -72,6 +71,18 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "default_secret_key_replace_this"
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_FILE_DIR'] = './.flask_session/'
 Session(app)
+
+# ฟังก์ชันตรวจสอบการเลือกเซิร์ฟเวอร์
+def require_selected_guild(f):
+    def wrapper(*args, **kwargs):
+        if 'oauth2_token' not in session:
+            return redirect(url_for('login'))
+        if 'selected_guild_id' not in session and request.path not in ['/servers', '/logout', '/callback', '/select_server'] and not request.path.startswith('/api/'):
+            flash("กรุณาเลือกเซิร์ฟเวอร์ก่อนดำเนินการต่อ", "warning")
+            return redirect(url_for('servers'))
+        return f(*args, **kwargs)
+    wrapper.__name__ = f.__name__
+    return wrapper
 
 # ตั้งค่าตัวแปรสำหรับเก็บข้อมูลการตั้งค่า
 CONFIG_FILE = 'config.json'
@@ -414,9 +425,9 @@ async def update_categories_info():
     with config_update_lock:
         try:
             await bot.wait_until_ready()
-            guild = bot.get_guild(GUILD_ID)
+            guild = bot.get_guild(int(session.get('selected_guild_id', GUILD_ID)))
             if not guild:
-                logger.error(f"ไม่พบเซิร์ฟเวอร์ที่มี ID: {GUILD_ID}")
+                logger.error(f"ไม่พบเซิร์ฟเวอร์ที่มี ID: {session.get('selected_guild_id', GUILD_ID)}")
                 if len(bot.guilds) > 0:
                     guild = bot.guilds[0]
                     GUILD_ID = guild.id
@@ -559,11 +570,11 @@ def login():
 def callback():
     if request.values.get('error'):
         flash(f"ข้อผิดพลาดจาก Discord: {request.values.get('error')}", "danger")
-        return redirect(url_for('index'))
+        return redirect(url_for('login'))
     
     if 'oauth2_state' not in session:
         flash("เซสชันหมดอายุหรือไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง", "warning")
-        return redirect(url_for('index'))
+        return redirect(url_for('login'))
     
     try:
         discord = make_session(state=session['oauth2_state'])
@@ -578,19 +589,36 @@ def callback():
     except Exception as e:
         logger.error(f"เกิดข้อผิดพลาดในขั้นตอนการตรวจสอบสิทธิ์: {str(e)}")
         flash("เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์ กรุณาลองอีกครั้ง", "danger")
-        return redirect(url_for('index'))
+        return redirect(url_for('login'))
 
 @app.route('/logout')
 def logout():
     session.pop('oauth2_token', None)
-    return redirect(url_for('index'))
+    session.pop('selected_guild_id', None)
+    flash("ออกจากระบบเรียบร้อยแล้ว", "success")
+    return redirect(url_for('login'))
 
 # Flask Routes - Main Pages
 @app.route('/')
+@require_selected_guild
 def index():
-    if 'oauth2_token' in session:
-        return redirect(url_for('servers'))
-    return render_template('login.html')
+    guild_info = None
+    if 'selected_guild_id' in session:
+        guild = bot.get_guild(int(session['selected_guild_id']))
+        if guild:
+            guild_info = {
+                'id': guild.id,
+                'name': guild.name,
+                'icon': guild.icon.url if guild.icon else None,
+                'text_channels': len(guild.text_channels),
+                'voice_channels': len(guild.voice_channels),
+                'categories': len(guild.categories),
+                'members': guild.member_count
+            }
+        else:
+            flash("เซิร์ฟเวอร์ที่เลือกไม่พบ กรุณาเลือกใหม่", "danger")
+            return redirect(url_for('servers'))
+    return render_template('dashboard.html', guild=guild_info)
 
 @app.route('/servers')
 def servers():
@@ -605,12 +633,14 @@ def servers():
         except oauthlib.oauth2.rfc6749.errors.TokenExpiredError:
             logger.warning("Discord token หมดอายุและไม่สามารถรีเฟรชได้")
             session.pop('oauth2_token', None)
+            session.pop('selected_guild_id', None)
             flash("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง", "warning")
             return redirect(url_for('login'))
         except (oauthlib.oauth2.rfc6749.errors.InvalidGrantError, 
                 oauthlib.oauth2.rfc6749.errors.OAuth2Error) as e:
             logger.error(f"OAuth2 error: {str(e)}")
             session.pop('oauth2_token', None)
+            session.pop('selected_guild_id', None)
             flash("เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์ กรุณาเข้าสู่ระบบใหม่", "danger")
             return redirect(url_for('login'))
         
@@ -628,10 +658,10 @@ def servers():
     except Exception as e:
         logger.error(f"เกิดข้อผิดพลาดในหน้า servers: {str(e)}")
         flash(f"เกิดข้อผิดพลาด: {str(e)}", "danger")
-        return redirect(url_for('index'))
+        return redirect(url_for('login'))
 
-@app.route('/dashboard/<guild_id>')
-def dashboard(guild_id):
+@app.route('/select_server/<guild_id>')
+def select_server(guild_id):
     if 'oauth2_token' not in session:
         return redirect(url_for('login'))
     guild = bot.get_guild(int(guild_id))
@@ -644,39 +674,33 @@ def dashboard(guild_id):
     if not user_in_guild:
         flash("คุณไม่มีสิทธิ์เข้าถึงเซิร์ฟเวอร์นี้", "danger")
         return redirect(url_for('servers'))
-    guild_info = {
-        'id': guild.id,
-        'name': guild.name,
-        'icon': guild.icon.url if guild.icon else None,
-        'text_channels': len(guild.text_channels),
-        'voice_channels': len(guild.voice_channels),
-        'categories': len(guild.categories),
-        'members': guild.member_count
-    }
-    return render_template('dashboard.html', guild=guild_info)
+    session['selected_guild_id'] = guild_id
+    session.modified = True  # Ensure session is saved
+    return redirect(url_for('index'))
 
 @app.route('/logs')
+@require_selected_guild
 def logs():
     return render_template('logs.html', logs=log_handler.logs)
 
 @app.route('/channels')
+@require_selected_guild
 def channels():
     return render_template('channels.html')
 
 @app.route('/chat')
+@require_selected_guild
 def chat():
-    if 'oauth2_token' not in session:
-        return redirect(url_for('login'))
     return render_template('chat.html')
 
 @app.route('/system_monitor')
+@require_selected_guild
 def system_monitor():
-    if 'oauth2_token' not in session:
-        return redirect(url_for('login'))
     return render_template('system_monitor.html')
 
 # Flask Routes - Settings
 @app.route('/settings', methods=['GET', 'POST'])
+@require_selected_guild
 def settings():
     if request.method == 'POST':
         try:
@@ -701,6 +725,7 @@ def settings():
     return render_template('settings.html', config=config, now=datetime.datetime.now())
 
 @app.route('/settings/categories', methods=['GET', 'POST'])
+@require_selected_guild
 def category_settings():
     if request.method == 'POST':
         try:
@@ -718,6 +743,7 @@ def category_settings():
     return render_template('category_settings.html', config=config, now=datetime.datetime.now())
 
 @app.route('/settings/commands', methods=['GET', 'POST'])
+@require_selected_guild
 def command_settings():
     if request.method == 'POST':
         try:
@@ -738,6 +764,7 @@ def command_settings():
     return render_template('command_settings.html', config=config, now=datetime.datetime.now())
 
 @app.route('/settings/intents', methods=['GET', 'POST'])
+@require_selected_guild
 def intent_settings():
     if request.method == 'POST':
         try:
@@ -758,10 +785,8 @@ def intent_settings():
     return render_template('intent_settings.html', config=config, now=datetime.datetime.now())
 
 @app.route('/settings/channel_names', methods=['GET', 'POST'])
+@require_selected_guild
 def channel_name_settings():
-    if 'oauth2_token' not in session:
-        return redirect(url_for('login'))
-    
     if request.method == 'POST':
         try:
             if 'channel_name_mappings' in request.form:
@@ -788,14 +813,11 @@ def channel_name_settings():
             logger.error(f"เกิดข้อผิดพลาดในการบันทึกการตั้งชื่อช่อง: {str(e)}")
             flash(f"เกิดข้อผิดพลาดในการบันทึกการตั้งชื่อช่อง: {str(e)}", "danger")
             return redirect(url_for('channel_name_settings'))
-    
     return render_template('manage_channel_names.html', config=config, now=datetime.datetime.now())
 
 @app.route('/settings/roles', methods=['GET', 'POST'])
+@require_selected_guild
 def role_settings():
-    if 'oauth2_token' not in session:
-        return redirect(url_for('login'))
-    
     try:
         future = asyncio.run_coroutine_threadsafe(get_guild_roles(), bot.loop)
         roles = future.result(timeout=10)
@@ -824,14 +846,11 @@ def role_settings():
             logger.error(f"เกิดข้อผิดพลาดในการบันทึกการตั้งค่าการจัดการยศ: {str(e)}")
             flash(f"เกิดข้อผิดพลาดในการบันทึกการตั้งค่า: {str(e)}", "danger")
             return redirect(url_for('role_settings'))
-    
     return render_template('manage_roles.html', config=config, roles=roles, now=datetime.datetime.now())
 
 @app.route('/settings/welcome_messages', methods=['GET', 'POST'])
+@require_selected_guild
 def welcome_message_settings():
-    if 'oauth2_token' not in session:
-        return redirect(url_for('login'))
-    
     if request.method == 'POST':
         try:
             if 'welcome_messages' in request.form:
@@ -858,7 +877,6 @@ def welcome_message_settings():
             logger.error(f"เกิดข้อผิดพลาดในการบันทึกการตั้งค่าข้อความต้อนรับ: {str(e)}")
             flash(f"เกิดข้อผิดพลาดในการบันทึกการตั้งค่า: {str(e)}", "danger")
             return redirect(url_for('welcome_message_settings'))
-    
     return render_template('welcome_message_settings.html', config=config, now=datetime.datetime.now())
 
 # Flask Routes - API Endpoints
@@ -1019,7 +1037,7 @@ def delete_intent(intent_name):
 @app.route('/api/channels/count')
 def get_channels_count():
     try:
-        guild = bot.get_guild(GUILD_ID)
+        guild = bot.get_guild(int(session.get('selected_guild_id', GUILD_ID)))
         if not guild:
             logger.error("ไม่พบเซิร์ฟเวอร์")
             return jsonify({'success': False, 'message': 'ไม่พบเซิร์ฟเวอร์', 'count': 0}), 404
@@ -1121,12 +1139,39 @@ def system_stats():
         memory_total = memory.total / (1024 ** 3)  # แปลงเป็น GB
         memory_used = memory.used / (1024 ** 3)    # แปลงเป็น GB
         memory_percent = memory.percent
+
+        # ดึงข้อมูล Disk Usage
+        disk = psutil.disk_usage('/')
+        disk_total = disk.total / (1024 ** 3)  # แปลงเป็น GB
+        disk_used = disk.used / (1024 ** 3)    # แปลงเป็น GB
+        disk_percent = disk.percent
+
+        # ดึงข้อมูล Network Activity
+        net_io = psutil.net_io_counters()
+        net_sent = net_io.bytes_sent / (1024 ** 2)  # แปลงเป็น MB
+        net_recv = net_io.bytes_recv / (1024 ** 2)  # แปลงเป็น MB
+
+        # ดึงข้อมูล Process Count
+        process_count = len(psutil.pids())
+
+        # ดึงข้อมูล System Uptime
+        boot_time = datetime.datetime.fromtimestamp(psutil.boot_time())
+        uptime = datetime.datetime.now() - boot_time
+        uptime_hours = uptime.total_seconds() / 3600  # แปลงเป็นชั่วโมง
+
         return jsonify({
             'success': True,
             'cpu_percent': cpu_percent,
             'memory_total': round(memory_total, 2),
             'memory_used': round(memory_used, 2),
-            'memory_percent': memory_percent
+            'memory_percent': memory_percent,
+            'disk_total': round(disk_total, 2),
+            'disk_used': round(disk_used, 2),
+            'disk_percent': disk_percent,
+            'net_sent': round(net_sent, 2),  # MB
+            'net_recv': round(net_recv, 2),  # MB
+            'process_count': process_count,
+            'uptime_hours': round(uptime_hours, 2)
         })
     except Exception as e:
         logger.error(f"เกิดข้อผิดพลาดในการดึงข้อมูลระบบ: {str(e)}")
@@ -1135,9 +1180,9 @@ def system_stats():
 async def get_guild_roles():
     try:
         await bot.wait_until_ready()
-        guild = bot.get_guild(GUILD_ID)
+        guild = bot.get_guild(int(session.get('selected_guild_id', GUILD_ID)))
         if not guild:
-            logger.error(f"ไม่พบเซิร์ฟเวอร์ที่มี ID: {GUILD_ID}")
+            logger.error(f"ไม่พบเซิร์ฟเวอร์ที่มี ID: {session.get('selected_guild_id', GUILD_ID)}")
             return []
         roles = [{"id": str(role.id), "name": role.name} for role in guild.roles if not role.permissions.administrator]
         logger.info("ดึงข้อมูลยศสำเร็จ")

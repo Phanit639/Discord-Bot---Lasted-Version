@@ -3,11 +3,79 @@
 {% block title %}หน้าแรก - ระบบจัดการบอท Discord{% endblock %}
 
 {% block content %}
+{% if guild %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex align-items-center">
+        {% if guild.icon %}
+        <img src="{{ guild.icon }}" class="server-icon-lg me-3" alt="{{ guild.name }}">
+        {% else %}
+        <div class="default-icon-lg me-3">{{ guild.name[:2] }}</div>
+        {% endif %}
+        <h2>{{ guild.name }}</h2>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">สมาชิก</h5>
+                        <p class="card-text display-6">{{ guild.members }}</p>
+                    </div>
+                    <i class="fas fa-users fa-3x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">ช่องข้อความ</h5>
+                        <p class="card-text display-6">{{ guild.text_channels }}</p>
+                    </div>
+                    <i class="fas fa-hashtag fa-3x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">ช่องเสียง</h5>
+                        <p class="card-text display-6">{{ guild.voice_channels }}</p>
+                    </div>
+                    <i class="fas fa-microphone fa-3x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">หมวดหมู่</h5>
+                        <p class="card-text display-6">{{ guild.categories }}</p>
+                    </div>
+                    <i class="fas fa-folder fa-3x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="row">
     <div class="col-12">
         <div class="card">
             <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="fas fa-tachometer-alt"></i> แดชบอร์ด</h4>
+                <h4 class="mb-0"><i class="fas fa-tachometer-alt"></i> สถานะระบบ</h4>
             </div>
             <div class="card-body">
                 <div class="row">
@@ -20,32 +88,6 @@
                                         <p class="card-text" id="bot-status">กำลังตรวจสอบ...</p>
                                     </div>
                                     <i class="fas fa-robot fa-3x"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card bg-success text-white mb-3">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h5 class="card-title mb-0">ช่องทั้งหมด</h5>
-                                        <p class="card-text" id="channels-count">กำลังโหลด...</p>
-                                    </div>
-                                    <i class="fas fa-hashtag fa-3x"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card bg-info text-white mb-3">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <h5 class="card-title mb-0">หมวดหมู่</h5>
-                                        <p class="card-text" id="categories-count">กำลังโหลด...</p>
-                                    </div>
-                                    <i class="fas fa-folder fa-3x"></i>
                                 </div>
                             </div>
                         </div>
@@ -74,30 +116,6 @@
             </div>
             <div class="card-footer">
                 <a href="/logs" class="btn btn-primary btn-sm">ดูล็อกทั้งหมด</a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="fas fa-cog"></i> การตั้งค่าทั่วไป</h5>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <h6>หมวดหมู่ที่ตั้งค่า</h6>
-                    <ul class="list-group" id="configured-categories">
-                        <li class="list-group-item text-center">
-                            <div class="spinner-border spinner-border-sm text-primary" role="status">
-                                <span class="visually-hidden">กำลังโหลด...</span>
-                            </div>
-                            กำลังโหลดข้อมูลหมวดหมู่...
-                        </li>
-                    </ul>
-                </div>
-                <div class="d-grid">
-                    <a href="/settings" class="btn btn-primary">ไปยังหน้าตั้งค่า</a>
-                </div>
             </div>
         </div>
     </div>
@@ -152,60 +170,6 @@
                 }
             }).fail(function () {
                 $('#bot-status').text('ไม่สามารถตรวจสอบ').addClass('text-warning');
-            });
-
-            // โหลดข้อมูลหมวดหมู่
-            $.get('/api/categories', function (data) {
-                const categoriesCount = Object.keys(data).length;
-                $('#categories-count').text(categoriesCount);
-
-                // อัปเดตรายการหมวดหมู่ที่ตั้งค่า
-                const categoriesContainer = $('#configured-categories');
-                categoriesContainer.empty();
-
-                if (categoriesCount === 0) {
-                    categoriesContainer.append(`
-                    <li class="list-group-item text-center">ไม่พบข้อมูลหมวดหมู่</li>
-                `);
-                } else {
-                    // แสดงตัวอย่าง 3 หมวดหมู่แรก
-                    let count = 0;
-                    for (const [id, name] of Object.entries(data)) {
-                        if (count < 3) {
-                            categoriesContainer.append(`
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                ${name}
-                                <span class="badge bg-primary">${id}</span>
-                            </li>
-                        `);
-                            count++;
-                        }
-                    }
-
-                    if (categoriesCount > 3) {
-                        categoriesContainer.append(`
-                        <li class="list-group-item text-center">
-                            <a href="/settings">ดูทั้งหมด ${categoriesCount} หมวดหมู่</a>
-                        </li>
-                    `);
-                    }
-                }
-            }).fail(function () {
-                $('#categories-count').text('ไม่สามารถโหลด');
-                $('#configured-categories').html(`
-                <li class="list-group-item text-center text-danger">ไม่สามารถโหลดข้อมูลหมวดหมู่</li>
-            `);
-            });
-
-            // โหลดข้อมูลจำนวนช่อง
-            $.get('/api/channels/count', function (data) {
-                if (data.success) {
-                    $('#channels-count').text(data.text_channels_count);
-                } else {
-                    $('#channels-count').text('ไม่สามารถโหลดได้');
-                }
-            }).fail(function () {
-                $('#channels-count').text('ไม่สามารถโหลดได้');
             });
         }
 

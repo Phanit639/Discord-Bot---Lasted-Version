@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}ตั้งค่า - ระบบจัดการบอท Discord{% endblock %}
+
+{% block head %}
+<style>
+    .setting-card {
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+    
+    .setting-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    
+    .setting-icon {
+        font-size: 3rem;
+        color: #7289DA;
+        margin-bottom: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-cog"></i> ตั้งค่าระบบ</h2>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card setting-card h-100">
+            <div class="card-body text-center py-5">
+                <div class="setting-icon">
+                    <i class="fas fa-folder"></i>
+                </div>
+                <h4 class="mb-3">ตั้งค่าหมวดหมู่</h4>
+                <p class="text-muted mb-4">กำหนดหมวดหมู่และคำสำคัญสำหรับการย้ายช่องอัตโนมัติ</p>
+                <a href="{{ url_for('category_settings') }}" class="btn btn-primary">
+                    <i class="fas fa-cog"></i> จัดการหมวดหมู่
+                </a>
+            </div>
+            <div class="card-footer bg-light">
+                <small class="text-muted">หมวดหมู่ทั้งหมด: {{ config.category_mapping|length }}</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card setting-card h-100">
+            <div class="card-body text-center py-5">
+                <div class="setting-icon">
+                    <i class="fas fa-terminal"></i>
+                </div>
+                <h4 class="mb-3">ตั้งค่าคำสั่ง</h4>
+                <p class="text-muted mb-4">กำหนดคำสั่งและข้อความตอบกลับสำหรับบอท</p>
+                <a href="{{ url_for('command_settings') }}" class="btn btn-primary">
+                    <i class="fas fa-cog"></i> จัดการคำสั่ง
+                </a>
+            </div>
+            <div class="card-footer bg-light">
+                <small class="text-muted">คำสั่งทั้งหมด: {{ config.messages|length }}</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card setting-card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-info-circle"></i> ข้อมูลระบบ</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>สถานะระบบ</h6>
+                        <ul class="list-group mb-4">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                สถานะบอท
+                                <span class="badge bg-success" id="bot-status">ออนไลน์</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                หมวดหมู่ทั้งหมด
+                                <span class="badge bg-primary">{{ config.categories|length }}</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                คำสั่งที่ลงทะเบียน
+                                <span class="badge bg-info">{{ config.messages|length }}</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>การดำเนินการ</h6>
+                        <div class="d-grid gap-2">
+                            <button id="refresh-categories" class="btn btn-outline-primary">
+                                <i class="fas fa-sync-alt"></i> รีเฟรชข้อมูลหมวดหมู่
+                            </button>
+                            <a href="{{ url_for('logs') }}" class="btn btn-outline-info">
+                                <i class="fas fa-list"></i> ดูล็อกระบบ
+                            </a>
+                            <a href="{{ url_for('servers') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-server"></i> จัดการเซิร์ฟเวอร์
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // ตรวจสอบสถานะบอท
+    function checkBotStatus() {
+        $.get('/api/server-status', function(data) {
+            if (data.online) {
+                $('#bot-status').removeClass('bg-danger').addClass('bg-success').text('ออนไลน์');
+            } else {
+                $('#bot-status').removeClass('bg-success').addClass('bg-danger').text('ออฟไลน์');
+            }
+        }).fail(function() {
+            $('#bot-status').removeClass('bg-success').addClass('bg-danger').text('ไม่สามารถเชื่อมต่อได้');
+        });
+    }
+    
+    // เรียกใช้ฟังก์ชันตรวจสอบสถานะครั้งแรก
+    checkBotStatus();
+    
+    // ตั้งเวลาตรวจสอบทุก 30 วินาที
+    setInterval(checkBotStatus, 30000);
+    
+    // รีเฟรชข้อมูลหมวดหมู่
+    $('#refresh-categories').click(function(e) {
+        e.preventDefault();
+        const button = $(this);
+        const originalText = button.html();
+        button.html('<i class="fas fa-spinner fa-spin"></i> กำลังรีเฟรช...');
+        button.prop('disabled', true);
+        $.ajax({
+            url: '/api/categories/refresh',
+            type: 'POST',
+            success: function(response) {
+                if (response.success) {
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    alert('เกิดข้อผิดพลาด: ' + response.message);
+                    button.html(originalText);
+                    button.prop('disabled', false);
+                }
+            },
+            error: function(xhr) {
+                alert('เกิดข้อผิดพลาดในการรีเฟรชหมวดหมู่: ' + xhr.statusText);
+                button.html(originalText);
+                button.prop('disabled', false);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

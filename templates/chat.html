@@ -38,26 +38,9 @@
         flex-grow: 1;
         margin-right: 10px;
     }
-    .chat-time {
-        font-size: 0.8em;
-        color: #6c757d;
-        margin-top: 5px;
-    }
     .debug-container {
         font-size: 0.9em;
         color: #6c757d;
-    }
-    .qr-container {
-        max-width: 200px;
-        margin: 10px 0;
-    }
-    .qr-container img {
-        width: 100%;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-    }
-    .verify-payment-btn {
-        margin-top: 10px;
     }
 </style>
 {% endblock %}
@@ -89,12 +72,8 @@
         <div class="debug-container">
             <p><strong>คำที่ตัด:</strong> <span id="tokenized-words">ไม่มี</span></p>
             <p><strong>เจตนาที่ตรวจพบ:</strong> <span id="detected-intent">ไม่มี</span></p>
-            <p><strong>สินค้าที่แนะนำ:</strong> <span id="recommended-product">ไม่มี</span></p>
-            <p><strong>Transaction ID:</strong> <span id="transaction-id">ไม่มี</span></p>
         </div>
         <div class="chat-input-container">
-            <input type="text" id="identifier" class="form-control" placeholder="เบอร์โทรศัพท์ (10 หลัก)" style="width: 150px; margin-right: 10px;" pattern="\d{10}">
-            <input type="number" id="payment-amount" class="form-control" placeholder="ยอดเงิน (บาท)" style="width: 150px; margin-right: 10px;">
             <input type="text" id="chat-input" class="form-control chat-input" placeholder="พิมพ์ข้อความถึงบอท...">
             <button id="send-message" class="btn btn-primary">
                 <i class="fas fa-paper-plane"></i> ส่ง
@@ -107,9 +86,6 @@
 {% block scripts %}
 <script>
     $(document).ready(function() {
-        let currentTransactionId = null;
-        let currentPaymentMethod = 'promptpay'; // คงที่เป็น PromptPay
-
         // โหลดแชทเมื่อหน้าโหลด
         $('#chat-loading').show();
         $('#chat-content').hide();
@@ -137,123 +113,48 @@
                 $('#chat-content').empty();
                 $('#tokenized-words').text('ไม่มี');
                 $('#detected-intent').text('ไม่มี');
-                $('#recommended-product').text('ไม่มี');
-                $('#transaction-id').text('ไม่มี');
-                currentTransactionId = null;
-                currentPaymentMethod = 'promptpay';
             }
         });
 
         function sendMessage() {
             const input = $('#chat-input');
             const message = input.val().trim();
-            const amount = $('#payment-amount').val();
-            const identifier = $('#identifier').val().trim();
 
-            if (!message && !amount) return;
-
-            // ตรวจสอบเบอร์โทรศัพท์
-            if (amount && (!identifier || !/^\d{10}$/.test(identifier))) {
-                alert('กรุณาระบุเบอร์โทรศัพท์ 10 หลักที่ถูกต้อง');
-                $('#identifier').focus();
-                return;
-            }
+            if (!message) return;
 
             // แสดงข้อความของผู้ใช้
-            const userMessageText = message || `ขอสร้าง QR สำหรับ ${amount} บาท`;
-            const userMessage = $('<div class="chat-message user"></div>').text(userMessageText);
-            const userTime = $('<div class="chat-time user"></div>').text(new Date().toLocaleTimeString('th-TH'));
-            $('#chat-content').append(userMessage, userTime);
+            const userMessage = $('<div class="chat-message user"></div>').text(message);
+            $('#chat-content').append(userMessage);
             input.val('');
-            $('#payment-amount').val('');
 
             // เลื่อนลงไปที่ข้อความล่าสุด
             $('.chat-container').scrollTop($('.chat-container')[0].scrollHeight);
 
             // ส่งข้อความไปยังเซิร์ฟเวอร์
-            const data = { message: message };
-            if (amount && identifier) {
-                // ส่งคำขอสร้าง QR code
-                $.ajax({
-                    url: '/api/generate_qr',
-                    type: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify({
-                        identifier: identifier,
-                        amount: parseFloat(amount)
-                    }),
-                    success: function(response) {
-                        if (response.success) {
-                            const botMessage = $('<div class="chat-message bot"></div>').text(`กรุณาชำระเงิน ${amount} บาท`);
-                            const botTime = $('<div class="chat-time bot"></div>').text(new Date().toLocaleTimeString('th-TH'));
-                            const qrContainer = $('<div class="qr-container"></div>');
-                            const qrImage = $('<img>').attr('src', `data:image/png;base64,${response.qr_data}`);
-                            qrContainer.append(qrImage);
-                            const verifyBtn = $('<button class="btn btn-success verify-payment-btn">ตรวจสอบสถานะการชำระเงิน</button>').data({
-                                'transaction-id': response.transaction_id,
-                                'payment-method': response.payment_method
-                            });
-                            $('#chat-content').append(botMessage, botTime, qrContainer, verifyBtn);
-                            currentTransactionId = response.transaction_id;
-                            currentPaymentMethod = response.payment_method;
-                            $('#transaction-id').text(currentTransactionId);
-                            $('.chat-container').scrollTop($('.chat-container')[0].scrollHeight);
-
-                            // เพิ่ม event handler สำหรับปุ่มตรวจสอบ
-                            $('.verify-payment-btn').off('click').on('click', function() {
-                                const transactionId = $(this).data('transaction-id');
-                                const paymentMethod = $(this).data('payment-method');
-                                verifyPayment(transactionId, paymentMethod);
-                            });
-                        } else {
-                            const errorMessage = $('<div class="chat-message bot"></div>').text('เกิดข้อผิดพลาด: ' + response.message);
-                            $('#chat-content').append(errorMessage);
-                            $('.chat-container').scrollTop($('.chat-container')[0].scrollHeight);
-                        }
-                    },
-                    error: function(xhr) {
-                        const errorMessage = $('<div class="chat-message bot"></div>').text('ไม่สามารถสร้าง QR code ได้');
+            $.ajax({
+                url: '/api/chat',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ message: message }),
+                success: function(response) {
+                    if (response.success) {
+                        const botMessage = $('<div class="chat-message bot"></div>').text(response.reply);
+                        $('#chat-content').append(botMessage);
+                        $('#tokenized-words').text(response.tokens ? response.tokens.join(', ') : 'ไม่มี');
+                        $('#detected-intent').text(response.intent || 'ไม่มี');
+                        $('.chat-container').scrollTop($('.chat-container')[0].scrollHeight);
+                    } else {
+                        const errorMessage = $('<div class="chat-message bot"></div>').text('เกิดข้อผิดพลาด: ' + response.message);
                         $('#chat-content').append(errorMessage);
                         $('.chat-container').scrollTop($('.chat-container')[0].scrollHeight);
                     }
-                });
-            } else {
-                // ส่งข้อความปกติ
-                $.ajax({
-                    url: '/api/chat',
-                    type: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify(data),
-                    success: function(response) {
-                        if (response.success) {
-                            const botMessage = $('<div class="chat-message bot"></div>').text(response.reply);
-                            const botTime = $('<div class="chat-time bot"></div>').text(new Date().toLocaleTimeString('th-TH'));
-                            $('#chat-content').append(botMessage, botTime);
-                            $('#tokenized-words').text(response.tokens ? response.tokens.join(', ') : 'ไม่มี');
-                            $('#detected-intent').text(response.intent || 'ไม่มี');
-                            $('#recommended-product').text(response.product_name || 'ไม่มี');
-                            $('.chat-container').scrollTop($('.chat-container')[0].scrollHeight);
-                        } else {
-                            const errorMessage = $('<div class="chat-message bot"></div>').text('เกิดข้อผิดพลาด: ' + response.message);
-                            $('#chat-content').append(errorMessage);
-                            $('.chat-container').scrollTop($('.chat-container')[0].scrollHeight);
-                        }
-                    },
-                    error: function(xhr) {
-                        const errorMessage = $('<div class="chat-message bot"></div>').text('ไม่สามารถเชื่อมต่อกับบอทได้');
-                        $('#chat-content').append(errorMessage);
-                        $('.chat-container').scrollTop($('.chat-container')[0].scrollHeight);
-                    }
-                });
-            }
-        }
-
-        function verifyPayment(transactionId, paymentMethod) {
-            // ฟังก์ชันนี้สามารถขยายได้ในอนาคตเมื่อมีระบบตรวจสอบการชำระเงิน
-            const botMessage = $('<div class="chat-message bot"></div>').text('การตรวจสอบสถานะการชำระเงินยังไม่พร้อมใช้งาน');
-            const botTime = $('<div class="chat-time bot"></div>').text(new Date().toLocaleTimeString('th-TH'));
-            $('#chat-content').append(botMessage, botTime);
-            $('.chat-container').scrollTop($('.chat-container')[0].scrollHeight);
+                },
+                error: function(xhr) {
+                    const errorMessage = $('<div class="chat-message bot"></div>').text('ไม่สามารถเชื่อมต่อกับบอทได้');
+                    $('#chat-content').append(errorMessage);
+                    $('.chat-container').scrollTop($('.chat-container')[0].scrollHeight);
+                }
+            });
         }
     });
 </script>

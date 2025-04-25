@@ -14,10 +14,7 @@
     </div>
     <div>
         <a href="{{ url_for('servers') }}" class="btn btn-outline-secondary me-2">
-            <i class="fas fa-arrow-left"></i> กลับ
-        </a>
-        <a href="{{ url_for('settings') }}" class="btn btn-primary">
-            <i class="fas fa-cog"></i> ตั้งค่า
+            <i class="fas fa-arrow-left"></i> Back to server
         </a>
     </div>
 </div>
@@ -77,13 +74,44 @@
     </div>
 </div>
 
-<!-- นำส่วนเดิมของแดชบอร์ด (index.html) มาใส่ที่นี่ -->
-<!-- เช่น ล็อกล่าสุด, การตั้งค่าทั่วไป, ฯลฯ -->
-
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">สถานะบอท</h5>
+                        <p class="card-text" id="bot-status">กำลังตรวจสอบ...</p>
+                    </div>
+                    <i class="fas fa-robot fa-3x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// โค้ด JavaScript ที่จำเป็น
+    $(document).ready(function() {
+        // ฟังก์ชันสำหรับอัปเดตสถานะบอท
+        function updateBotStatus() {
+            $.get('/api/server-status', function(data) {
+                if (data.online) {
+                    $('#bot-status').text('ออนไลน์').css('color', '#ffffff');
+                } else {
+                    $('#bot-status').text('ออฟไลน์').removeClass('text-warning').addClass('text-danger');
+                }
+            }).fail(function() {
+                $('#bot-status').text('ไม่สามารถตรวจสอบ').removeClass('text-danger').addClass('text-warning');
+            });
+        }
+
+        // อัปเดตสถานะในครั้งแรก
+        updateBotStatus();
+
+        // อัปเดตทุก 30 วินาที
+        setInterval(updateBotStatus, 30000);
+    });
 </script>
 {% endblock %}
